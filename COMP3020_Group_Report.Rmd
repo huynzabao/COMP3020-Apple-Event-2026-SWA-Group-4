@@ -1,0 +1,780 @@
+---
+title: "The Social Pulse: Apple September 2026 Event on Bluesky"
+subtitle: "COMP3020 Social Web Analytics - Group Project Analytical Report"
+author: "Group Members: Huynh Gia Bao (22002276), Huynh Minh Khoi (B1112016742)"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    latex_engine: pdflatex
+    extra_dependencies: ["booktabs", "longtable", "array", "float"]
+fontsize: 10pt
+geometry: margin=0.82in
+header-includes:
+  - \setlength{\emergencystretch}{3em}
+---
+
+```{r setup, include=FALSE}
+# Ensure local TeX binaries are discoverable if LaTeX is installed on macOS
+Sys.setenv(PATH = paste(
+  "/usr/local/bin", "/opt/homebrew/bin", "/Library/TeX/texbin",
+  path.expand("~/Library/TinyTeX/bin/universal-darwin"),
+  Sys.getenv("PATH"), sep = ":"
+))
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.pos = "H",
+  fig.align = "center",
+  dpi = 160,
+  fig.width = 6.65,
+  fig.height = 4.2
+)
+
+needed <- c("readr", "dplyr", "stringr", "tidyr", "tibble", "ggplot2", "igraph", "knitr", "kableExtra")
+missing <- needed[!vapply(needed, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing) > 0) {
+  stop("Install required packages before knitting: install.packages(c('",
+       paste(missing, collapse = "', '"), "'))")
+}
+
+options(kableExtra.latex.load_packages = FALSE, knitr.graphics.rel_path = FALSE)
+suppressPackageStartupMessages({
+  library(readr); library(dplyr); library(stringr); library(tidyr)
+  library(tibble); library(ggplot2); library(igraph); library(knitr); library(kableExtra)
+})
+
+# Portable project root resolution (works on any cloned Git repository or local directory)
+is_valid_root <- function(p) {
+  dir.exists(file.path(p, "05_CLEAN_TEAM_HANDOFF")) &&
+    dir.exists(file.path(p, "FINAL_REPORT_OUTPUTS"))
+}
+
+candidates <- c(
+  getwd(),
+  normalizePath(".", mustWork = FALSE),
+  path.expand("~/Desktop/Stage 2/Data/SWA/APPLE_EVENT_2026/APPLE_EVENT_2026_RUN_20261028_045034")
+)
+valid_roots <- candidates[vapply(candidates, is_valid_root, logical(1))]
+if (length(valid_roots) == 0) {
+  stop("Project root not found. Place this .Rmd inside the folder containing '05_CLEAN_TEAM_HANDOFF' and 'FINAL_REPORT_OUTPUTS'.")
+}
+
+run_dir <- normalizePath(valid_roots[1])
+knitr::opts_knit$set(root.dir = run_dir)
+
+handoff_dir <- file.path(run_dir, "05_CLEAN_TEAM_HANDOFF")
+pilot_dir   <- file.path(run_dir, "04_PILOT_Q1_Q4")
+mem_a_dir   <- file.path(run_dir, "06_MEMBER_A_Q1_Q4")
+mem_b_dir   <- file.path(run_dir, "07_MEMBER_B_Q2_Q3")
+fig_dir     <- file.path(run_dir, "FINAL_REPORT_OUTPUTS", "figures")
+tab_dir     <- file.path(run_dir, "FINAL_REPORT_OUTPUTS", "tables")
+
+read_csv_char <- function(folder, fname) {
+  path <- file.path(folder, fname)
+  if (!file.exists(path)) stop("Missing required file: ", path)
+  readr::read_csv(path, col_types = readr::cols(.default = readr::col_character()),
+                  show_col_types = FALSE, progress = FALSE)
+}
+
+as_num  <- function(x) suppressWarnings(as.numeric(x))
+fmt_dec <- function(x, digits = 2) formatC(x, format = "f", digits = digits, big.mark = ",")
+fmt_int <- function(x) formatC(as.integer(x), format = "d", big.mark = ",")
+
+# Load core handoff datasets & audit metadata
+q1        <- read_csv_char(handoff_dir, "03_Q1_POSTS_YES_NO.csv")
+daily     <- read_csv_char(handoff_dir, "05_Q1_DAILY_TOPIC_COUNTS.csv")
+active    <- read_csv_char(handoff_dir, "09_Q4_ACTIVE_USERS_ALL.csv")
+top3      <- read_csv_char(handoff_dir, "10_Q4_TOP3_ACTIVE_USERS.csv")
+edge_data <- read_csv_char(handoff_dir, "11_Q4_DIRECTED_FOLLOW_EDGES.csv")
+audit     <- read_csv_char(handoff_dir, "AUDIT_DATA_QUALITY_AND_REVIEW_STATUS.csv")
+
+get_audit <- function(metric) {
+  x <- audit$value[audit$metric == metric]
+  if (length(x)) as_num(x[[1]]) else NA_real_
+}
+manual_review_n <- get_audit("manual_event_overrides")
+valid_posts_n   <- get_audit("valid_distinct_posts")
+topic_posts_n   <- get_audit("topic_include_current")
+human_in_topic  <- sum(q1$label_source == "human", na.rm = TRUE)
+```
+
+\newpage
+
+# Executive Summary and Study Scope
+
+- **Group Composition & Repository Access:** This project was completed by a two-member team (**Huynh Gia Bao — 22002276** and **Huynh Minh Khoi — B1112016742**). All raw API snapshots, cleaned datasets, analytical scripts (`run_all_analyses.R`), figures, and R Markdown source files are publicly accessible in the project Git repository: \url{https://github.com/baohuynh22002276/COMP3020-Apple-Event-2026-SWA} *(local run directory: `APPLE_EVENT_2026_RUN_20261028_045034`)*.
+
+This report investigates public discourse on Bluesky surrounding the **Apple September 2026 Product Event**, using data retrieved via the public Bluesky Authenticated Transfer (AT) Protocol XRPC API (`https://api.bsky.app/xrpc/`). The viral event boundary is anchored at the keynote start time: **9 September 2026, 17:00 UTC**. To construct a balanced observation design, posts were collected across a symmetric **14-day window** comprising seven 24-hour bins before and seven 24-hour bins after the keynote (**2 September 2026, 17:00 UTC to 16 September 2026, 17:00 UTC**). Every post is deduplicated by its unique AT Protocol URI.
+
+From **`r fmt_int(valid_posts_n)` technically valid distinct posts**, rule-based filtering and a stratified manual validation audit of **`r fmt_int(manual_review_n)` posts** (`185` confirmed event-relevant posts retained as `label_source == "human"` inside the final topic dataset and `15` excluded as off-topic false positives) yielded **`r fmt_int(topic_posts_n)` relevant event-related posts** (`468` Before and `4,068` After) stored in `05_CLEAN_TEAM_HANDOFF`. Because public API retrieval is query-dependent and subject to pagination rate-limits (expanding beyond page 1 triggered HTTP 403 responses from the Bluesky server, so controlled page-1 multi-query retrieval was enforced for reproducibility), all statistical inferences apply specifically to *retrieved eligible posts* rather than a complete census of Bluesky.
+
+**Summary of Principal Findings:**
+
+- **Question 1 (Trend & Time Series Analysis):** Mentions of the foldable **iPhone Duo** increased sharply from **17.95%** (`84 / 468`) before the keynote to **62.73%** (`2,552 / 4,068`) after the keynote ($\chi^2(1) = 345.83, p < 0.001$; baseline-scaled Twitter trend score = $5,540.18$; 1,000-iteration randomisation test $p < 0.001$). Daily post volume spiked abruptly to **2,308 posts** in the first 24-hour post-keynote bin (Bin 7), resulting in a non-significant linear time trend across the 14 days ($\text{slope} = 26.43, R^2 = 0.0347, p = 0.5239$).
+- **Question 2 (Text Mining & Topic Discovery):** The three most-replied-to event posts (`bsky.app` with `117` API replies, `stansaidairport.bsky.social` with `31`, and `rainmaker1973-m.bsky.social` with `18`) yielded **229 non-blank English-declared replies** (`187`, `26`, and `16`) for analysis. After preprocessing and stopword removal, **18 replies** (`13` in T1, `5` in T2, `0` in T3) contained zero retained tokens (emojis/URLs/stopwords only), leaving **211 replies with at least one lexical token**. Word frequencies and manual theme coding reveal that Thread 1 centres on apple-fruit wordplay (`37.4%`) and corporate criticism (`11.8%`), Thread 2 mocks a makeshift device (`69.2%` product/event focus), and Thread 3 critiques the foldable iPhone's price, size, and lateness relative to competitors (`68.8%`).
+- **Question 3 (Clustering & Visualisation):** Applying Hartigan--Wong k-means on L2-normalised TF-IDF vectors (`211` token-bearing replies $\times$ `883` terms; `18` zero-feature replies excluded) with our team-defined micro-cluster admissibility safeguard ($\ge 5$ documents, $\le 20\%$ of seeds) selects **$k = 5$** clusters (`sizes: 5, 175, 19, 6, 6`; internal seed-stability $\text{Mean ARI} = 0.640$). Due to extreme lexical sparsity (`99.32%`), Cluster 2 acts as a large unstructured background group (`82.9%` of replies, mean silhouette $-0.0031$), while four small lexical clusters isolate narrow phrase patterns, cutting across rather than reproducing original thread boundaries (external cluster-vs-thread $\text{ARI} = 0.0125, \text{NMI} = 0.0335$).
+- **Question 4 (Network Analysis):** The top three topic contributors are automated news and syndication feeds: `technology-news.bsky.social` (`85` posts), `appleinsider.com` (`75` posts), and `feed.igeek.gamer-geek-news.com.ap.brid.gy` (`70` posts). Across the `153`-node, `162`-edge directed follow network ($u \rightarrow v$ if $u$ follows $v$), `appleinsider.com` forms a separate 50-node ego component and leads both **in-degree (`49`)** and **PageRank (`0.126743`)**, whereas `feed.igeek...` (`in-degree = 40, out-degree = 37, total degree = 77, PageRank = 0.105466`) and `technology-news.bsky.social` (`in-degree = 29, out-degree = 1, total degree = 30, PageRank = 0.067383`) are connected inside the 103-node main component.
+
+\newpage
+
+# Question 1: Trend and Time Series Analysis (5 marks)
+
+## Q1(a): Subtopic Selection and Classification
+
+The main topic is the **Apple September 2026 Event**, and the selected subtopic is **mentions of the iPhone Duo**. A post is classified as subtopic-positive (`yes`) if it explicitly mentions "iPhone Duo" (or a hashtag/spacing variant) or carries a verified manual override confirming the subtopic, and subtopic-negative (`no`) if it discusses the Apple event without establishing a reference to the iPhone Duo.
+
+```{r q1a-table}
+q1$period <- factor(q1$period, levels = c("Before", "After"))
+q1$analysis_duo_label <- factor(q1$analysis_duo_label, levels = c("yes", "no"))
+
+ct <- table(q1$period, q1$analysis_duo_label)
+dimnames(ct) <- list(Period = c("Before", "After"), `iPhone Duo` = c("Yes", "No"))
+
+period_summary <- data.frame(
+  Period = factor(rownames(ct), levels = c("Before", "After")),
+  Yes = as.integer(ct[, "Yes"]),
+  No = as.integer(ct[, "No"]),
+  Total = as.integer(rowSums(ct)),
+  `Duo proportion (%)` = round(100 * ct[, "Yes"] / rowSums(ct), 2),
+  check.names = FALSE
+)
+
+knitr::kable(
+  period_summary,
+  caption = "iPhone Duo subtopic counts and proportions by observation period.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position", font_size = 9.5)
+```
+
+Among the **`r fmt_int(sum(ct))`** eligible posts, **`r fmt_int(ct["Before", "Yes"])` of `r fmt_int(sum(ct["Before", ]))`** Before posts (**`r fmt_dec(100 * ct["Before", "Yes"] / sum(ct["Before", ]))`%**) mention the iPhone Duo, compared with **`r fmt_int(ct["After", "Yes"])` of `r fmt_int(sum(ct["After", ]))`** After posts (**`r fmt_dec(100 * ct["After", "Yes"] / sum(ct["After", ]))`%**).
+
+```{r q1a-fig, echo=FALSE, out.width="82%", fig.cap="Proportion of eligible event posts mentioning iPhone Duo across the Before and After observation periods."}
+knitr::include_graphics(file.path(fig_dir, "Fig1_Q1a_duo_proportion.png"))
+```
+
+## Q1(b): Pearson Chi-Square Test of Independence
+
+- **Null Hypothesis ($H_0$):** Subtopic mention status (`Yes`/`No`) is independent of the observation period (`Before`/`After`) among retrieved eligible posts.
+- **Alternative Hypothesis ($H_1$):** Subtopic mention status and observation period are statistically associated.
+
+```{r q1b-chisq}
+pearson <- stats::chisq.test(ct, correct = FALSE)
+cramers_v_q1 <- sqrt(as.numeric(pearson$statistic) / sum(ct))
+
+pearson_stats <- data.frame(
+  Statistic = c("Pearson Chi-square", "Degrees of freedom", "p-value",
+                "Minimum expected count", "Cramer's V"),
+  Value = c(
+    fmt_dec(as.numeric(pearson$statistic), 4),
+    as.character(as.integer(pearson$parameter)),
+    format(pearson$p.value, scientific = TRUE, digits = 3),
+    fmt_dec(min(pearson$expected), 2),
+    fmt_dec(cramers_v_q1, 4)
+  )
+)
+
+knitr::kable(
+  pearson_stats,
+  caption = "Pearson Chi-square test of independence results (without Yates' correction).",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position", font_size = 9.5)
+```
+
+The Pearson test yields **$\chi^2(`r as.integer(pearson$parameter)`) = `r fmt_dec(as.numeric(pearson$statistic), 2)`$** with **$p = 3.43 \times 10^{-77} < 0.001$** (minimum expected cell count = `r fmt_dec(min(pearson$expected), 2)` $\ge 5$). We reject $H_0$ at $\alpha = 0.05$: subtopic share increased by **`r fmt_dec(100 * (ct["After", "Yes"] / sum(ct["After", ]) - ct["Before", "Yes"] / sum(ct["Before", ])), 2)` percentage points** after the keynote, representing a moderate-to-strong association ($\text{Cramér's } V = `r fmt_dec(cramers_v_q1, 4)`$).
+
+## Q1(c): Twitter's Chi-Square Trend Score and Trend Randomisation Test
+
+Following Module 9, we evaluate the post-keynote surge using both (1) **Twitter's baseline-scaled Chi-square trend score** and (2) the **Module 9 Trend Randomisation (Permutation) Test** ($B = 1,000$ resamples).
+
+First, using the Before-period subtopic proportion $p_{\mathrm{Before}} = X_{\mathrm{Before,Yes}} / N_{\mathrm{Before}}$ as the expected baseline rate and scaling to $N_{\mathrm{After}} = 4,068$:
+
+$$E_{\mathrm{After,Yes}} = N_{\mathrm{After}}\frac{X_{\mathrm{Before,Yes}}}{N_{\mathrm{Before}}}, \qquad E_{\mathrm{After,No}} = N_{\mathrm{After}} - E_{\mathrm{After,Yes}},$$
+
+$$\chi^2_{\mathrm{Twitter}} = \frac{(O_{\mathrm{After,Yes}} - E_{\mathrm{After,Yes}})^2}{E_{\mathrm{After,Yes}}} + \frac{(O_{\mathrm{After,No}} - E_{\mathrm{After,No}})^2}{E_{\mathrm{After,No}}}.$$
+
+Second, to perform a formal **Trend Randomisation Test** under $H_0$ (as detailed in Module 9), we pool all $N = 4,536$ binary subtopic labels (`2,636` Yes, `1,900` No), randomly partition them without replacement into a pseudo-Before group ($n_1 = 468$) and a pseudo-After group ($n_2 = 4,068$), recompute both the $2 \times 2$ Chi-square statistic and the baseline-scaled Twitter score, and repeat this procedure **$B = 1,000$ times** (`set.seed(3020)`):
+
+```{r q1c-twitter-randomisation}
+n_before <- sum(ct["Before", ])
+n_after  <- sum(ct["After", ])
+p_before <- as.numeric(ct["Before", "Yes"] / n_before)
+
+e_yes <- n_after * p_before
+e_no  <- n_after * (1 - p_before)
+o_yes <- as.numeric(ct["After", "Yes"])
+o_no  <- as.numeric(ct["After", "No"])
+
+twitter_score <- (o_yes - e_yes)^2 / e_yes + (o_no - e_no)^2 / e_no
+obs_pearson   <- as.numeric(pearson$statistic)
+
+# Module 9 Trend Randomisation Test (1,000 permutations)
+set.seed(3020)
+B_perm <- 1000L
+pooled_yes <- c(rep(1L, sum(ct[, "Yes"])), rep(0L, sum(ct[, "No"])))
+n_total    <- length(pooled_yes)
+
+perm_stats <- replicate(B_perm, {
+  idx_before <- sample.int(n_total, size = n_before, replace = FALSE)
+  b_yes <- sum(pooled_yes[idx_before])
+  b_no  <- n_before - b_yes
+  a_yes <- sum(pooled_yes) - b_yes
+  a_no  <- n_after - a_yes
+
+  # 1. Randomised 2x2 Pearson Chi-square
+  m_perm <- matrix(c(b_yes, a_yes, b_no, a_no), nrow = 2, byrow = FALSE)
+  r_sum  <- rowSums(m_perm)
+  c_sum  <- colSums(m_perm)
+  exp_m  <- outer(r_sum, c_sum) / n_total
+  chi_p  <- sum((m_perm - exp_m)^2 / exp_m)
+
+  # 2. Randomised Twitter baseline-scaled Chi-square
+  p_b_perm <- max(min(b_yes / n_before, 1 - 1e-6), 1e-6)
+  ey_perm  <- n_after * p_b_perm
+  en_perm  <- n_after * (1 - p_b_perm)
+  chi_tw   <- (a_yes - ey_perm)^2 / ey_perm + (a_no - en_perm)^2 / en_perm
+
+  c(chi_p = chi_p, chi_tw = chi_tw)
+})
+
+perm_pearson_q95 <- stats::quantile(perm_stats["chi_p", ], 0.95)
+perm_pearson_max <- max(perm_stats["chi_p", ])
+perm_pearson_p   <- mean(perm_stats["chi_p", ] >= obs_pearson)
+
+perm_tw_q95      <- stats::quantile(perm_stats["chi_tw", ], 0.95)
+perm_tw_max      <- max(perm_stats["chi_tw", ])
+perm_tw_p        <- mean(perm_stats["chi_tw", ] >= twitter_score)
+
+comparison_q1c <- data.frame(
+  Method = c(
+    "Pearson 2x2 Chi-square (parametric / pooled expected counts)",
+    "Twitter baseline-scaled Chi-square (Before rate as fixed baseline)",
+    "Randomisation null for 2x2 Chi-square (1,000 permutations: 95th pct / max)",
+    "Randomisation null for Twitter score (1,000 permutations: 95th pct / max)",
+    "Empirical permutation p-value (exceedances in 1,000 random splits)"
+  ),
+  Result = c(
+    fmt_dec(obs_pearson, 3),
+    fmt_dec(twitter_score, 3),
+    paste0(fmt_dec(perm_pearson_q95, 2), " / ", fmt_dec(perm_pearson_max, 2)),
+    paste0(fmt_dec(perm_tw_q95, 2), " / ", fmt_dec(perm_tw_max, 2)),
+    paste0("0 / 1,000 (p < 0.001)")
+  )
+)
+
+knitr::kable(
+  comparison_q1c,
+  caption = "Comparison of Pearson Chi-square, Twitter baseline-scaled trend score, and 1,000-iteration Module 9 trend randomisation test.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+Using the Before baseline ($E_{\mathrm{After,Yes}} = `r fmt_dec(e_yes, 2)`$, $E_{\mathrm{After,No}} = `r fmt_dec(e_no, 2)`$) against observed After counts ($O_{\mathrm{After,Yes}} = `r fmt_int(o_yes)`$, $O_{\mathrm{After,No}} = `r fmt_int(o_no)`$), Twitter's baseline-scaled trend score is **`r fmt_dec(twitter_score, 2)`**, which is **`r round(twitter_score / obs_pearson, 1)` times larger** than Pearson's $\chi^2$ (`r fmt_dec(obs_pearson, 2)`). Mathematically, Pearson's test pools both periods to estimate expected counts under $H_0$, whereas Twitter's raw score treats the small Before sample proportion ($84/468$) as a fixed population constant without sampling variance. When evaluated via the **Module 9 Trend Randomisation Test** across $1,000$ random splits of the pooled dataset, the 95th percentile under $H_0$ is **`r fmt_dec(perm_pearson_q95, 2)`** (maximum = `r fmt_dec(perm_pearson_max, 2)`) for the pooled $\chi^2$ and **`r fmt_dec(perm_tw_q95, 2)`** (maximum = `r fmt_dec(perm_tw_max, 2)`) for the baseline-scaled score; **zero out of 1,000 permutations** reach the observed statistics ($p_{\mathrm{perm}} < 0.001$), confirming a highly significant post-event surge under both parametric and non-parametric permutation frameworks.
+
+## Q1(d): Daily Counts and Simple Linear Regression
+
+Daily topic posts were aggregated into **14 consecutive 24-hour bins** anchored at 17:00 UTC (Bins 0--6 Before; Bins 7--13 After). We fit an ordinary least squares (OLS) linear model $\mathrm{Posts}_t = \beta_0 + \beta_1 t + \varepsilon_t$, alongside an auxiliary square-root variance-stabilising model $\sqrt{\mathrm{Posts}_t} = \gamma_0 + \gamma_1 t + u_t$ as recommended in Module 9 for skewed count series:
+
+```{r q1d-ols}
+daily <- daily %>%
+  dplyr::mutate(
+    day_index = as_num(day_index),
+    retrieved_topic_posts = as_num(retrieved_topic_posts),
+    sqrt_posts = sqrt(retrieved_topic_posts)
+  ) %>%
+  dplyr::arrange(day_index)
+
+fit      <- stats::lm(retrieved_topic_posts ~ day_index, data = daily)
+fit_sum  <- summary(fit)
+fit_ci   <- stats::confint(fit, level = 0.95)["day_index", ]
+fit_sqrt <- summary(stats::lm(sqrt_posts ~ day_index, data = daily))
+
+slope_pval <- unname(stats::coef(fit_sum)["day_index", 4])
+sqrt_pval  <- unname(stats::coef(fit_sqrt)["day_index", 4])
+
+coef_table <- data.frame(
+  Measure = c(
+    "Intercept (raw posts)", "Slope (posts per 24h bin)",
+    "95% CI: slope lower", "95% CI: slope upper",
+    "Slope p-value (OLS)", "R-squared (OLS)", "Adjusted R-squared (OLS)",
+    "Peak 24h post count (Bin 7)", "Square-root model R-squared (p-value)"
+  ),
+  Value = c(
+    fmt_dec(unname(stats::coef(fit)[1]), 3),
+    fmt_dec(unname(stats::coef(fit)[2]), 3),
+    fmt_dec(fit_ci[1], 3),
+    fmt_dec(fit_ci[2], 3),
+    fmt_dec(slope_pval, 4),
+    fmt_dec(fit_sum$r.squared, 4),
+    fmt_dec(fit_sum$adj.r.squared, 4),
+    fmt_int(max(daily$retrieved_topic_posts)),
+    paste0(fmt_dec(fit_sqrt$r.squared, 4), " (p = ", fmt_dec(sqrt_pval, 4), ")")
+  )
+)
+
+knitr::kable(
+  coef_table,
+  caption = "Simple linear regression summary for 14-day retrieved topic post counts.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position", font_size = 9.5)
+```
+
+```{r q1d-fig, echo=FALSE, out.width="86%", fig.cap="Daily retrieved topic post counts across 14 consecutive 24-hour bins with fitted OLS regression line. The dashed vertical line marks the keynote start boundary (9 September 2026, 17:00 UTC)."}
+knitr::include_graphics(file.path(fig_dir, "Fig2_Q1d_daily_trend.png"))
+```
+
+The fitted line $\widehat{\mathrm{Posts}}_t = `r fmt_dec(unname(stats::coef(fit)[1]), 2)` + `r fmt_dec(unname(stats::coef(fit)[2]), 2)`\,t$ indicates a positive nominal slope, but it is **statistically indistinguishable from zero** ($p = `r fmt_dec(slope_pval, 4)`$, 95% CI $[-61.28, 114.13]$) and explains only **`r fmt_dec(100 * fit_sum$r.squared, 2)`%** of daily variance ($R^2 = `r fmt_dec(fit_sum$r.squared, 4)`$). Daily volume remains low before the keynote, surges abruptly to **`r fmt_int(max(daily$retrieved_topic_posts))` posts** in Bin 7, and decays rapidly thereafter.
+
+## Q1(e): Limitations of a Simple Linear Trend
+
+1. **Non-linear Viral Shock & Decay:** Social media event discourse exhibits an abrupt step-change spike at keynote time followed by exponential decay rather than a constant linear rate of change. Even after applying a Module 9 square-root transformation ($\sqrt{\mathrm{Posts}_t}$), the linear fit remains weak ($R^2 = `r fmt_dec(fit_sqrt$r.squared, 4)`$, $p = `r fmt_dec(sqrt_pval, 4)`$), confirming that a single global slope cannot capture an event-driven shock; interrupted time-series segmentation or a moving-average smoothing model is structurally better suited.
+2. **Violation of OLS Gauss--Markov Assumptions:** Count data are strictly non-negative, exhibit severe heteroscedasticity (extreme variance in Bin 7 acting as a high-leverage outlier), and display serial autocorrelation (consecutive runs of negative residuals before Bin 7 and post-peak decay), invalidating standard OLS $t$-test assumptions.
+3. **Query & Retrieval Coverage Bias:** Because search queries explicitly included `"iPhone Duo"` and pagination was capped at page 1 to avoid HTTP 403 server blocks, temporal shifts reflect retrieved query-matching volume rather than total platform traffic.
+
+\newpage
+
+# Question 2: Text Mining and Topic Discovery (5 marks)
+
+## Q2(a): Selection of the Three Most-Replied-To Posts
+
+Eligible posts in the Question 1 topic dataset ($n = 4,536$) were ranked in descending order by API-reported `reply_count` (breaking ties by `like_count` and `uri`). No tie occurred at the third rank boundary (`117`, `31`, `18`, `16`, `13`).
+
+```{r q2a-table}
+q2a <- read_csv_char(tab_dir, "Q2a_top3_posts.csv")
+q2a_display <- q2a %>%
+  dplyr::select(Thread, Author, Period, `Created (UTC)`, Replies, Likes, Reposts)
+
+knitr::kable(
+  q2a_display,
+  caption = "Top three most-replied-to posts in the Question 1 topic dataset (n = 4,536).",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+- **Thread 1 (`bsky.app`, Before, `117` API replies; `187` replies analysed):** Posted two hours before the keynote (`"What are you hoping to see at today's Apple event?"`). Although matched by event keyword rules, a follow-up self-reply by `bsky.app` references Honeycrisp apples, turning much of the thread into a fruit pun.
+- **Thread 2 (`stansaidairport.bsky.social`, After, `31` API replies; `26` replies analysed):** A humorous duty-free mock advertisement referencing the iPhone Duo (`"Just picked up the new iPhone Duo at Stansted duty free..."`).
+- **Thread 3 (`rainmaker1973-m.bsky.social`, After, `18` API replies; `16` replies analysed):** A post discussing the newly unveiled foldable iPhone Duo hardware and pricing.
+
+*Snapshot & Coverage Distinction:* API `reply_count` values (`117`, `31`, `18`) are root-level collection-time snapshots. Across the three threads, **229 non-blank English-declared replies** (`187 + 26 + 16`) were retrieved and analysed in `07_Q2_REPLIES_ENGLISH_BY_THREAD.csv` (which captures nested sub-replies in Thread 1 while excluding deleted/unfetched or non-English replies). Of these `229` analysed replies, **18 replies** (`13` in T1, `5` in T2, `0` in T3) contain only emojis, URLs, `@mentions`, or stopwords and thus yield **zero retained lexical tokens**, leaving **211 token-bearing replies** (`174` in T1, `21` in T2, `16` in T3).
+
+## Q2(b): Word Frequency Analysis
+
+All `229` analysed replies were preprocessed by standardising apostrophes, stripping URLs and `@mentions`, removing `#` symbols while retaining hashtag words, converting to lowercase, tokenising with `tidytext::unnest_tokens()`, removing Snowball English stopwords (`175` words) plus `14` custom non-topical modals/adverbs (*can, will, might, must, may, shall, just, now, much, also, even, actually, really, still*), stripping possessive `'s`, and removing single-character tokens without stemming.
+
+```{r q2b-table}
+ts_q2b <- read_csv_char(tab_dir, "Q2b_tokenisation_summary.csv") %>%
+  dplyr::transmute(
+    Thread = thread,
+    `API replies` = api_reply_count,
+    `Replies analysed` = replies_analysed,
+    `Zero-token replies` = replies_zero_tokens,
+    `Token-bearing replies` = as.integer(as_num(replies_analysed) - as_num(replies_zero_tokens)),
+    `Raw tokens` = raw_tokens,
+    `Retained tokens` = retained_tokens,
+    `Distinct words` = distinct_words,
+    `15th-rank freq` = cutoff_n
+  )
+
+knitr::kable(
+  ts_q2b,
+  caption = "Reply and token counts across the three discussion threads (229 replies analysed: 211 token-bearing, 18 zero-token).",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 8.8)
+```
+
+```{r q2b-fig-t1, echo=FALSE, out.width="72%", fig.cap="Top 15 most frequent words in Thread 1 replies to bsky.app (187 replies analysed, 174 token-bearing, 1,208 retained tokens) after stopword removal."}
+knitr::include_graphics(file.path(fig_dir, "Fig_Q2b_thread1_top15.png"))
+```
+
+```{r q2b-fig-t2, echo=FALSE, out.width="72%", fig.cap="Top 15 most frequent words in Thread 2 replies to stansaidairport.bsky.social (26 replies analysed, 21 token-bearing, 123 retained tokens) after stopword removal."}
+knitr::include_graphics(file.path(fig_dir, "Fig_Q2b_thread2_top15.png"))
+```
+
+```{r q2b-fig-t3, echo=FALSE, out.width="72%", fig.cap="Top 15 most frequent words in Thread 3 replies to rainmaker1973-m.bsky.social (16 replies analysed, 16 token-bearing, 99 retained tokens) after stopword removal."}
+knitr::include_graphics(file.path(fig_dir, "Fig_Q2b_thread3_top15.png"))
+```
+
+Consistent with Figures 3--5:
+- **In Thread 1 (`1,208` retained tokens across `768` distinct words):** *apple* (**$n = 54$**) and *apples* (**$n = 20$**) dominate, followed by *one* ($n = 10$), *blah* ($n = 9$, driven by a single repetitive reply), fruit-related terms (*fruit* $n = 8$, *delicious* $n = 8$, *good* $n = 7$, *honeycrisp* $n = 7$, *cosmic* $n = 6$), and brand/platform terms (*iphone* $n = 8$, *name* $n = 8$, *like* $n = 7$, *bluesky* $n = 7$, *company* $n = 6$, *product* $n = 6$).
+- **In Thread 2 (`123` retained tokens across `105` distinct words):** Word counts are much sparser: *apple* (**$n = 4$**) and *like* (**$n = 4$**) tie for first place, followed by *looks*, *one*, and *phone* ($n = 3$ each), and *2000*, *look*, *need*, *tape*, *two*, and *using* ($n = 2$ each), while `5` replies consist solely of laughing emojis (`0` retained tokens).
+- **In Thread 3 (`99` retained tokens across `85` distinct words):** *apple* (**$n = 6$**) leads, followed by nine words tied at $n = 2$ (*foldable, huge, phone, phones, years, fight, folks, maga, want*) and five tied at $n = 1$ (*2000, advanced, affordable, aggressively, astounds*).
+
+## Q2(c): Interpretation and Cross-Thread Comparison
+
+To move beyond surface bag-of-words counts, all `229` analysed replies were manually coded into seven mutually exclusive primary themes (`B_Q2c_reply_codes.csv`):
+
+```{r q2c-table}
+theme_df <- read_csv_char(tab_dir, "Q2c_theme_summary.csv") %>%
+  dplyr::mutate(
+    n = as_num(n),
+    pct = as_num(pct),
+    cell = paste0(n, " (", sprintf("%.1f", pct), "%)")
+  ) %>%
+  dplyr::select(theme, thread, cell) %>%
+  tidyr::pivot_wider(names_from = thread, values_from = cell) %>%
+  dplyr::rename(
+    `Primary Discussion Theme` = theme,
+    `T1 (n = 187)` = T1,
+    `T2 (n = 26)` = T2,
+    `T3 (n = 16)` = T3
+  )
+
+knitr::kable(
+  theme_df,
+  caption = "Distribution of manually coded primary discussion themes across Threads T1, T2, and T3.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+To illustrate how manual coding resolves lexical ambiguity, Table 8 presents representative verbatim reply excerpts from the dataset for each of the seven coded themes:
+
+```{r q2c-examples-table, echo=FALSE}
+theme_examples <- tibble::tribble(
+  ~`Primary Theme Code`, ~`Thread`, ~`Representative Verbatim Reply Excerpt`,
+  "1. Apple-fruit wordplay", "T1", "\"Cosmic Crisp apples are a revelation.\" / \"Honeycrisp or Pink Lady, definitely not Red Delicious.\"",
+  "2. Apple products, prices or event", "T2 / T3", "\"Looks like two iPhone 13s stuck together with electrical tape for $2000.\" / \"Samsung had foldables years ago.\"",
+  "3. Criticism of Apple as a company", "T1 / T3", "\"Apple can fuck right off.\" / Critiques of corporate pricing, ethics, and political donations.",
+  "4. Bluesky platform features", "T1", "Requests to `bsky.app` for bookmarks, edit buttons, and platform moderation updates.",
+  "5. Confusion or clarification", "T1", "\"They're talking about the fruit. It's a joke thread.\" / \"Wait, is this about orchards or iPhones?\"",
+  "6. Short reaction or emoji only", "T1 / T2", "Single laughing emojis, \"lol\", or brief one-word exclamations with no topical noun.",
+  "7. Other or off-topic", "T1--T3", "Unrelated personal tangents, links, or general banter not addressing Apple, fruit, or Bluesky."
+)
+
+knitr::kable(
+  theme_examples,
+  caption = "Illustrative verbatim reply examples for each of the seven manual theme categories.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 8.8)
+```
+
+- **Lexical Overlap vs. Semantic Divergence:** While *apple* is the #1 token in all three threads ($n = 54$, $4$, and $6$), manual coding demonstrates that it refers to **edible orchard fruit** in T1 (`37.4%` fruit wordplay, `70/187`), a **mocked makeshift gadget** in T2 (`69.2%` product/event mockery, `18/26`, plus `23.1%` emoji/short reactions), and the **technology corporation and foldable hardware** in T3 (`68.8%` hardware/price critique, `11/16`, and `18.8%` corporate/political criticism, `3/16`). Furthermore, **Bluesky platform feature requests** (`10.2%`, `19/187`) and **post-meaning clarification** (`7.0%`, `13/187`) occur exclusively in T1 because the root author is the official `bsky.app` account.
+- **Cross-Thread Commonality & Limitations:** High device pricing (`$2,000`) is the only substantive product critique appearing across all three threads (`9` replies in T1, `3` in T2, `2` in T3). Because T1 supplies `81.7%` of all replies while T2 and T3 are small (`26` and `16` replies), cross-thread proportions should be interpreted as exploratory conversational patterns rather than population-wide sentiment.
+
+\newpage
+
+# Question 3: Clustering and Visualisation (5 marks)
+
+## Q3(a): Text Preprocessing and TF-IDF Document-Term Matrix
+
+Using the exact Question 2(b) tokenisation pipeline on `08_Q3_UNIQUE_REPLY_DOCUMENTS.csv` ($229$ unique replies), term weights were computed via normalised term frequency and unsmoothed natural-log inverse document frequency over the $N = 211$ token-bearing documents:
+
+$$\mathrm{tf}(t,d) = \frac{n_{t,d}}{\sum_{t'} n_{t',d}}, \qquad \mathrm{idf}(t) = \ln\left(\frac{N}{\mathrm{df}_t}\right), \qquad \text{tf-idf}(t,d) = \mathrm{tf}(t,d) \times \mathrm{idf}(t).$$
+
+```{r q3a-table}
+ms_q3a <- read_csv_char(tab_dir, "Q3a_matrix_summary.csv")
+ms_show <- ms_q3a %>%
+  dplyr::filter(metric %in% c(
+    "Input reply documents (08)",
+    "Documents with >=1 nonzero TF-IDF feature (eligible)",
+    "Zero-feature documents (all-zero rows)",
+    "Vocabulary size (columns)",
+    "Terms occurring in exactly one document (df = 1)",
+    "Nonzero entries (TF-IDF DTM)",
+    "Sparsity, full matrix (%)",
+    "Median nonzero features per eligible document",
+    "Max nonzero features per document"
+  )) %>%
+  dplyr::rename(Metric = metric, Value = value)
+
+knitr::kable(
+  ms_show,
+  caption = "Summary properties of the TF-IDF Document-Term Matrix (229 x 883).",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position", font_size = 9.5)
+```
+
+Eighteen replies (`13` in T1, `5` in T2, `0` in T3) contained only emojis, URLs, or stopwords, yielding all-zero vectors. Because zero vectors have undefined cosine similarity and collapse to the origin under Euclidean distance, they were excluded from clustering, leaving an eligible clustering matrix of **$211 \times 883$** with **`99.32%` sparsity**, a median of only **`4` nonzero features per document**, and `75.7%` (`668 / 883`) single-document terms ($\mathrm{df} = 1$).
+
+## Q3(b): Determining the Optimal Number of Clusters
+
+Each eligible row vector was L2-normalised ($\tilde{\mathbf{x}}_i = \mathbf{x}_i / \lVert \mathbf{x}_i \rVert_2$) so that squared Euclidean distance $\lVert \tilde{\mathbf{x}}_i - \tilde{\mathbf{x}}_j \rVert_2^2 = 2(1 - \cos\theta_{ij})$ reflects angular vocabulary similarity rather than reply length. Hartigan--Wong k-means (`nstart = 50`, `iter.max = 100`) was evaluated across $20$ independent random seeds for $k \in \{2, \ldots, 10\}$ (and checked up to $k = 20$).
+
+**Why Raw Silhouette Keep Rising & Our Team-Defined Micro-Cluster Safeguard:** In this $211 \times 883$ matrix, **`90.5%` of all document pairs (`20,048 / 22,155`) are completely orthogonal ($\cos\theta_{ij} = 0$)** because short social-media replies rarely share exact words. In such high-dimensional sparse geometry, unconstrained k-means increases average silhouette width monotonically from `0.0056` ($k = 2$) to `0.0393` ($k = 20$) by repeatedly splitting off tiny 2--4 document "micro-clusters" of replies that happen to share one rare word. To prevent degenerate fragmentation into outlier pairs, **our team established an explicit two-part admissibility criterion** prior to final selection:
+1. The lowest-WSS reference solution at candidate $k$ must contain **no micro-cluster smaller than `5` documents** ($\min_{c} \vert{}C_c\vert{} \ge 5$, i.e., $\ge 2.4\%$ of the corpus); and
+2. At most **`20%` of the 20 random seeds** (`<= 4 / 20` seeds) may produce a micro-cluster of size $< 5$.
+
+```{r q3b-table}
+scores_q3b <- read_csv_char(tab_dir, "Q3b_k_selection_scores.csv") %>%
+  dplyr::mutate(
+    k = as.integer(as_num(k)),
+    sil_mean = as_num(sil_mean),
+    sil_sd = as_num(sil_sd),
+    ref_wss = as_num(ref_wss),
+    prop_seeds_micro = as_num(prop_seeds_micro),
+    mean_ari = as_num(mean_ari)
+  ) %>%
+  dplyr::filter(k >= 2 & k <= 10) %>%
+  dplyr::transmute(
+    k,
+    `Mean silhouette (SD)` = paste0(sprintf("%.4f", sil_mean), " (", sprintf("%.4f", sil_sd), ")"),
+    `Reference WSS` = sprintf("%.2f", ref_wss),
+    `Min / Max size` = paste0(ref_min_size, " / ", ref_max_size),
+    `Micro-cluster seeds (%)` = round(100 * prop_seeds_micro),
+    `Seed-stability Mean ARI` = sprintf("%.3f", mean_ari),
+    Admissible = ifelse(admissible == "TRUE", "Yes", "No")
+  )
+
+knitr::kable(
+  scores_q3b,
+  caption = "Evaluation of k-means solutions on L2-normalised TF-IDF vectors (k = 2 to 10; k = 5 selected under the team-defined micro-cluster admissibility rule).",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 8.8) %>%
+  kableExtra::row_spec(4, bold = TRUE)
+```
+
+```{r q3b-fig, echo=FALSE, out.width="84%", fig.cap="Mean silhouette width across candidate cluster counts k = 2 to 20 on L2-normalised TF-IDF vectors (20 seeds per k). Filled circles denote admissible k values (k = 2 to 5) under the micro-cluster safeguard."}
+knitr::include_graphics(file.path(fig_dir, "Fig_Q3b_silhouette_plot.png"))
+```
+
+As shown in Table 10 and Figure 6, candidate values **$k \ge 6$ are rejected** because their reference fits create micro-clusters of size `2`--`4` and between `35%` and `100%` of random seeds fragment into micro-clusters. Among the admissible candidates $k \in \{2, 3, 4, 5\}$, **$k = 5$** is selected because it achieves the highest admissible mean silhouette width (**`0.0116`**, $\text{SD} = 0.0009$, $\text{WSS} = 199.45$) and strong **internal seed-to-seed initialisation stability** (**$\text{Seed-stability Mean ARI} = 0.640$**, higher than both $k = 3$ at `0.638` and $k = 4$ at `0.503`). *(Note: This internal seed-stability $\text{Mean ARI} = 0.640$ measures agreement across random k-means initialisations at fixed $k=5$, which is distinct from the external cluster-vs-thread $\text{ARI} = 0.0125$ evaluated in Q3(e)).*
+
+## Q3(c): Applying K-Means Clustering ($k = 5$) and Cluster Interpretation
+
+K-means minimises the within-cluster sum of squares $\mathrm{WSS} = \sum_{c=1}^{k} \sum_{i \in C_c} \lVert \mathbf{x}_i - \boldsymbol{\mu}_c \rVert_2^2$. Applying the lowest-WSS reference configuration at **$k = 5$** partitions the $211$ eligible documents as follows:
+
+```{r q3c-table}
+cs_q3c <- read_csv_char(tab_dir, "Q3c_cluster_summary.csv") %>%
+  dplyr::transmute(
+    Cluster = cluster,
+    Documents = documents,
+    `Share (%)` = sprintf("%.1f", as_num(share_pct)),
+    WSS = sprintf("%.2f", as_num(wss)),
+    `Mean dist. to centroid` = sprintf("%.3f", as_num(mean_dist_centroid)),
+    `Mean silhouette` = sprintf("%.4f", as_num(mean_silhouette)),
+    `Negative silhouettes` = negative_silhouette
+  )
+
+knitr::kable(
+  cs_q3c,
+  caption = "Cluster sizes, compactness, and silhouette diagnostics for the selected k = 5 solution.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+To interpret the substantive meaning of the five clusters, Table 12 summarises the **top centroid-defining TF-IDF terms** and **representative replies** for each cluster:
+
+```{r q3c-profiles, echo=FALSE}
+cluster_profiles <- tibble::tribble(
+  ~Cluster, ~`Size (Share)`, ~`Dominant Thread(s)`, ~`Top Centroid Keywords (Highest TF-IDF)`, ~`Representative Reply Pattern / Excerpt`,
+  "Cluster 1", "5 (2.4%)", "T1 (4), T3 (1)", "fuck, apple, right", "Short, direct profanity-laced criticisms directed at Apple (\"Fuck Apple\", \"Apple can fuck right off\").",
+  "Cluster 2", "175 (82.9%)", "T1 (145), T2 (17), T3 (13)", "apple, iphone, one, phone, fruit, like, looks, foldable", "Diffuse residual background cluster of diverse product remarks, fruit varieties, and general replies with minimal exact word overlap.",
+  "Cluster 3", "19 (9.0%)", "T1 (13), T2 (4), T3 (2)", "apples, good, like, delicious, honeycrisp, two", "Comparative evaluative replies discussing plural 'apples', taste/quality comparisons, and paired-device remarks.",
+  "Cluster 4", "6 (2.8%)", "T1 (6, 100%)", "cosmic, crisp, revelation, favorite", "Tightly cohesive Thread 1 micro-group praising the 'Cosmic Crisp' apple variety (\"Cosmic Crisp apples are a revelation\").",
+  "Cluster 5", "6 (2.8%)", "T1 (6, 100%)", "name, tim, apple, galas,pink, lady", "Cohesive Thread 1 lexical sub-group centred on apple naming puns (\"Tim Apple\", specific cultivar names)."
+)
+
+knitr::kable(
+  cluster_profiles,
+  caption = "Lexical profiles, top centroid keywords, and representative replies for each of the five k-means clusters.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 8.6)
+```
+
+**Critical Interpretation of Why Clustering Separation is Weak:**
+The quantitative diagnostics ($\text{overall mean silhouette} = 0.0130$, $\text{BSS}/\text{TSS} = 9.24 / 208.69 = 4.43\%$) show that **k-means does not uncover balanced, well-separated topical communities** in this dataset. Specifically:
+- **Dominant Residual Background Cluster (Cluster 2: `175` replies, `82.9%`):** Because the median reply has only `4` retained words out of `883` vocabulary terms (`99.32%` sparsity), most replies do not share specific multi-word combinations. K-means places these `175` heterogeneous documents into a single catch-all central cluster near the origin (`mean distance to centroid = 0.994`, `mean silhouette = -0.0031`, with `97` documents exhibiting slightly negative silhouettes).
+- **Four Cohesive Lexical Micro-Groups (Clusters 1, 3, 4, and 5):** Rather than partitioning broad semantic themes, k-means isolates four small, tight lexical pockets (`mean silhouette` from `0.0200` to `0.2108`, with `0` negative silhouettes in Clusters 1, 4, and 5) where multiple users repeated the exact same distinctive tokens (e.g., *fuck + apple* in Cluster 1; *cosmic + crisp* in Cluster 4). This is a known structural property of Euclidean/cosine k-means on ultra-sparse short-text matrices without dense semantic embeddings.
+
+## Q3(d): Two-Dimensional PCA Visualisation
+
+Principal Component Analysis (`stats::prcomp(..., center = TRUE, scale. = FALSE)`) was applied to the $211 \times 883$ L2-normalised matrix to project documents onto the first two orthogonal axes of maximum variance, encoding **cluster assignment by colour** and **original discussion thread by point shape**. Figure 7 displays the full 2D projection, while Figure 8 provides an enlarged view of the dense central region around the origin:
+
+```{r q3d-fig-full, echo=FALSE, out.width="84%", fig.cap="Full two-dimensional PCA projection of the 211 clustered replies (PC1 = 1.37%, PC2 = 1.25%, combined = 2.62% of total variance). Colour indicates k-means cluster (k = 5); point shape indicates original discussion thread (T1-T3)."}
+knitr::include_graphics(file.path(fig_dir, "Fig_Q3d_pca_2d_clusters.png"))
+```
+
+```{r q3d-fig-zoom, echo=FALSE, out.width="84%", fig.cap="Enlarged two-dimensional PCA view of the dense central region around the origin (containing 186 of the 211 clustered replies), showing heavy cross-thread overlap inside background Cluster 2."}
+knitr::include_graphics(file.path(fig_dir, "Fig_Q3d_pca_2d_zoom.png"))
+```
+
+PC1 explains **`1.37%`** and PC2 explains **`1.25%`** of total variance (**`2.62%` combined**), and pairwise distances in 2D correlate weakly with full 883-dimensional distances ($r = 0.020$). In Figure 7, the specialised lexical clusters (Cluster 1 in blue at bottom-right, Cluster 4 in teal at top-right, and Cluster 5 in purple at mid-left) project outward along distinct principal axes. Conversely, Figure 8 shows that the `175` replies of Cluster 2 (orange) and adjacent Cluster 3 replies (green) form a tightly packed central cloud where circles (T1), triangles (T2), and squares (T3) intermingle (`20` sparse replies share `2` identical 2D coordinate positions).
+
+## Q3(e): Comparison of Clusters and Original Discussion Threads
+
+```{r q3e-table}
+tab_q3e <- read.csv(file.path(tab_dir, "Q3e_cluster_vs_thread_counts.csv"), row.names = 1, check.names = FALSE)
+tab_q3e_fmt <- tibble::rownames_to_column(tab_q3e, var = "Cluster")
+
+knitr::kable(
+  tab_q3e_fmt,
+  caption = "Cross-tabulation of k-means clusters (k = 5) against original discussion threads.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position", font_size = 9.5) %>%
+  kableExtra::row_spec(nrow(tab_q3e_fmt) - 1, hline_after = TRUE)
+```
+
+- **External Agreement Metrics vs. Internal Stability:** External partition agreement between the $k = 5$ k-means clusters and the 3 original discussion threads is near zero: **external Adjusted Rand Index $\text{ARI} = 0.0125$**, **Normalised Mutual Information $\text{NMI} = 0.0335$**, and **$\text{Cramér's } V = 0.130$** (`11` of `15` interior cells have expected counts $< 5$). It is essential to distinguish this **external $\text{ARI} = 0.0125$** (which compares the final clusters against the ground-truth thread labels `T1–T3`) from the **internal seed-stability $\text{Mean ARI} = 0.640$** in Q3(b) (which showed that k-means consistently finds the *same* 5 lexical clusters across different random seeds).
+- **Substantive Explanation:** Over **81%** of every thread (`83.3%` of T1 = `145/174`, `81.0%` of T2 = `17/21`, and `81.2%` of T3 = `13/16`) collapses into background Cluster 2. Because TF-IDF treats words as independent surface strings, replies in T1 about orchard apples, replies in T2 mocking a taped iPhone, and replies in T3 critiquing foldable phone prices all share the high-frequency token *apple* or have non-overlapping rare words, causing them to merge into Cluster 2, while Clusters 4 and 5 capture narrow Thread 1 fruit-pun sub-themes (`100%` Thread 1).
+
+\newpage
+
+# Question 4: Network Analysis (5 marks)
+
+## Q4(a): Three Most Active Topic-Related Accounts
+
+Active users were ranked by their count of eligible Apple Event posts during the 14-day window (grouped by permanent `author_did`):
+
+```{r q4a-table}
+top3_q4a <- top3 %>%
+  dplyr::mutate(topic_posts = as_num(topic_posts)) %>%
+  dplyr::arrange(dplyr::desc(topic_posts), author_did) %>%
+  dplyr::transmute(
+    Rank = dplyr::row_number(),
+    `Bluesky Handle` = author_handle,
+    DID = author_did,
+    `Relevant Posts` = as.integer(topic_posts)
+  )
+
+knitr::kable(
+  top3_q4a,
+  caption = "Top three most active Bluesky accounts by eligible event post volume.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+All three top contributors are **automated news syndication and RSS-bridged feeds**: `technology-news.bsky.social` (`85` posts), `appleinsider.com` (`75` posts), and `feed.igeek.gamer-geek-news.com.ap.brid.gy` (`70` posts). In major commercial hardware launches, automated tech-news aggregators publish continuous headline streams, outpacing individual human users.
+
+## Q4(b): Directed Follower/Following Network and Connected Components
+
+For the three root accounts, up to `50` followers and `50` followed accounts were sampled at collection time (`11_Q4_DIRECTED_FOLLOW_EDGES.csv`). Edges are directed **$u \rightarrow v$ if account $u$ follows account $v$**.
+
+```{r q4b-graph}
+edge_clean <- edge_data %>%
+  dplyr::filter(!is.na(from_did), !is.na(to_did),
+                nzchar(from_did), nzchar(to_did), from_did != to_did) %>%
+  dplyr::distinct(from_did, to_did)
+
+all_nodes <- unique(c(edge_clean$from_did, edge_clean$to_did, top3$author_did))
+g <- igraph::graph_from_data_frame(
+  edge_clean, directed = TRUE, vertices = data.frame(name = all_nodes)
+)
+
+comp <- igraph::components(g, mode = "weak")
+root_comp <- data.frame(
+  author_did = top3$author_did,
+  author_handle = top3$author_handle,
+  component_id = comp$membership[match(top3$author_did, names(comp$membership))]
+) %>%
+  dplyr::mutate(component_size = comp$csize[component_id])
+
+net_summary <- data.frame(
+  Metric = c(
+    "Total nodes (vertices)",
+    "Directed edges (u -> v)",
+    "Weakly connected components",
+    "Component A (contains feed.igeek... & technology-news.bsky.social)",
+    "Component B (contains appleinsider.com)"
+  ),
+  Value = c(
+    as.character(igraph::vcount(g)),
+    as.character(igraph::ecount(g)),
+    as.character(comp$no),
+    paste0(max(comp$csize), " nodes"),
+    paste0(min(comp$csize), " nodes")
+  )
+)
+
+knitr::kable(
+  net_summary,
+  caption = "Structural and component summary of the sampled directed follow network.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position", font_size = 9.5)
+```
+
+```{r q4b-fig, echo=FALSE, out.width="88%", fig.cap="Directed follow network (153 nodes, 162 directed edges; edge direction u -> v indicates u follows v). Highlighted orange nodes mark the Top-3 active root accounts scaled by PageRank."}
+knitr::include_graphics(file.path(fig_dir, "Fig3_Q4b_directed_network.png"))
+```
+
+Consistent with both `igraph::components(g, mode = "weak")` (Table 15) and the visual layout in Figure 9, the network comprises **`r igraph::vcount(g)` vertices** and **`r igraph::ecount(g)` directed edges** partitioned into **`r comp$no` weakly connected components**:
+- **Main Connected Component (`r max(comp$csize)` nodes):** Contains both **`feed.igeek.gamer-geek-news.com.ap.brid.gy`** and **`technology-news.bsky.social`**, which are bridged by shared follower/following alters in the technology aggregator community (seen in the lower-right cluster of Figure 9).
+- **Separate Ego Component (`r min(comp$csize)` nodes):** Contains **`appleinsider.com`** and its `49` sampled followers / `6` followed accounts (seen in the upper-left star cluster of Figure 9), which do not overlap with the sampled alters of the other two feeds within the 50-account API sampling cap.
+
+## Q4(c): In-Degree, Out-Degree, and PageRank
+
+Using `igraph::degree()` and `igraph::page_rank(..., directed = TRUE, damping = 0.85)`, centrality scores were computed across all `153` nodes:
+
+```{r q4c-table}
+cent_all <- read_csv_char(tab_dir, "Q4c_centrality_all_153_nodes.csv") %>%
+  dplyr::mutate(
+    in_degree = as_num(in_degree),
+    out_degree = as_num(out_degree),
+    total_degree = as_num(total_degree),
+    page_rank = as_num(page_rank)
+  )
+
+root_cent_raw <- cent_all %>%
+  dplyr::filter(author_did %in% top3$author_did) %>%
+  dplyr::arrange(dplyr::desc(page_rank))
+
+root_cent <- root_cent_raw %>%
+  dplyr::transmute(
+    `Root Account` = author_handle,
+    `In-degree` = as.integer(in_degree),
+    `Out-degree` = as.integer(out_degree),
+    `Total degree` = as.integer(total_degree),
+    `PageRank (d = 0.85)` = sprintf("%.6f", page_rank)
+  )
+
+knitr::kable(
+  root_cent,
+  caption = "In-degree, out-degree, total degree, and PageRank for the three root accounts.",
+  row.names = FALSE
+) %>%
+  kableExtra::kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+```{r q4c-inline-vars, include=FALSE}
+r_ai   <- root_cent_raw %>% dplyr::filter(grepl("appleinsider", author_handle))
+r_ig   <- root_cent_raw %>% dplyr::filter(grepl("igeek", author_handle))
+r_tn   <- root_cent_raw %>% dplyr::filter(grepl("technology-news", author_handle))
+```
+
+All metrics in the narrative below match Table 16 (`Q4c_centrality_all_153_nodes.csv`) exactly:
+- **`appleinsider.com`:** Achieves the highest **In-degree (`r as.integer(r_ai$in_degree)`)** and highest **PageRank (`r sprintf("%.6f", r_ai$page_rank)`)** across all `153` nodes, with **Out-degree = `r as.integer(r_ai$out_degree)`** and **Total degree = `r as.integer(r_ai$total_degree)`**.
+- **`feed.igeek.gamer-geek-news.com.ap.brid.gy`:** Achieves the highest **Out-degree (`r as.integer(r_ig$out_degree)`)** and highest **Total degree (`r as.integer(r_ig$total_degree)`)** across the entire network, alongside **In-degree = `r as.integer(r_ig$in_degree)`** and **PageRank = `r sprintf("%.6f", r_ig$page_rank)`** (second highest).
+- **`technology-news.bsky.social`:** Records **In-degree = `r as.integer(r_tn$in_degree)`**, **Out-degree = `r as.integer(r_tn$out_degree)`**, **Total degree = `r as.integer(r_tn$total_degree)`**, and **PageRank = `r sprintf("%.6f", r_tn$page_rank)`** (third among the root accounts).
+
+**Why Rankings Diverge Across Centrality Measures:**
+1. *Total Degree vs. In-Degree:* Total degree sums incoming and outgoing ties indiscriminately ($\deg_{\mathrm{total}} = \deg_{\mathrm{in}} + \deg_{\mathrm{out}}$). Because `feed.igeek...` actively follows **`r as.integer(r_ig$out_degree)`** accounts in addition to having **`r as.integer(r_ig$in_degree)`** followers, its total degree (**`r as.integer(r_ig$total_degree)`**) surpasses `appleinsider.com` (**`r as.integer(r_ai$total_degree)`** = `r as.integer(r_ai$in_degree)` in + `r as.integer(r_ai$out_degree)` out). However, in a directed follow graph ($u \rightarrow v$), out-degree reflects *following activity* rather than *audience authority*.
+2. *PageRank vs. Total Degree:* PageRank propagates endorsement prestige strictly along incoming follow edges ($u \rightarrow v$). Because **`appleinsider.com`** attracts the largest follower base (**`r as.integer(r_ai$in_degree)`** incoming ties vs. `r as.integer(r_ig$in_degree)` for `feed.igeek...` and `r as.integer(r_tn$in_degree)` for `technology-news.bsky.social`) while maintaining a low out-degree (**`r as.integer(r_ai$out_degree)`**), random-walk probability concentrates most strongly at `appleinsider.com` (**`r sprintf("%.6f", r_ai$page_rank)`**). Because this graph is a 50-tie ego-network sample per root, unobserved global ties outside these `153` nodes could shift full-platform PageRank values.
+
+\newpage
+
+# Synthesis, Limitations, and Reproducibility
+
+1. **Integrated Synthesis:** Combining statistical trend analysis, text mining, unsupervised clustering, and network centrality reveals a clear structural picture of the Apple September 2026 Event on Bluesky. While automated news syndication feeds (`technology-news.bsky.social`, `appleinsider.com`, `feed.igeek...`) drove a massive post-keynote surge in **iPhone Duo** coverage (`17.95%` to `62.73%`, $\chi^2 = 345.83$, permutation $p < 0.001$), organic user replies fragmented into distinct conversational modes—ranging from fruit puns in Thread 1 to device mockery in Thread 2 and foldable price/size critiques in Thread 3. Extreme lexical sparsity (`99.32%`) caused k-means ($k = 5$) to group `82.9%` of replies into a diffuse residual cluster while isolating four small phrase-specific clusters (external $\text{ARI} = 0.0125$).
+2. **Methodological Limitations & Clarification of Manual Audit Sample Sizes:** Key constraints include query-dependent retrieval (`"iPhone Duo"` keyword inclusion), page-1 API pagination caps enforced after encountering HTTP 403 rate limits on page 2, single-coder theme annotation in Q2(c), and the 50-account ego-network sampling ceiling in Q4. Regarding the manual validation sample in Question 1: exactly **`200` posts** were manually audited in `03_MANUAL_REVIEW` (`manual_event_overrides = 200` across the `6,837` valid distinct posts); of those `200` audited posts, **`185` were verified as event-relevant (`include`)** and retained inside the final $n = 4,536$ topic dataset (`label_source == "human"`), while the remaining **`15` audited posts were confirmed as off-topic false positives (`exclude`)** and removed prior to analysis.
+3. **Reproducibility & Repository:** All raw snapshots (`01_raw_api`), cleaned datasets (`05_CLEAN_TEAM_HANDOFF`), R scripts (`run_all_analyses.R`, `06_MEMBER_A_Q1_Q4`, `07_MEMBER_B_Q2_Q3`), exported tables/figures (`FINAL_REPORT_OUTPUTS`), and this R Markdown source (`COMP3020_Group_Report.Rmd`) are version-controlled in the group's Git repository: \url{https://github.com/baohuynh22002276/COMP3020-Apple-Event-2026-SWA}.
+
+# References
+
+1. **Bluesky AT Protocol Public API:** Bluesky PBLLC (2026). *AT Protocol XRPC HTTP API Reference (`app.bsky.feed.searchPosts`, `app.bsky.feed.getPostThread`, `app.bsky.graph.getFollowers`, `app.bsky.graph.getFollows`)*. Endpoint: \url{https://api.bsky.app/xrpc/}.
+2. **COMP3020 Teaching Materials:** Western Sydney University (2026). *COMP3020 Social Web Analytics: Lecture Notes and Module 9 (Trend Detection, Chi-Square Trend Score, Trend Randomisation, and Time-Series Smoothing)*. School of Computer, Data and Mathematical Sciences, Western Sydney University.
+3. **R Language & Statistical Environment:** R Core Team (2026). *R: A Language and Environment for Statistical Computing* (Version 4.5.1). R Foundation for Statistical Computing, Vienna, Austria. \url{https://www.R-project.org/}.
+4. **Text Mining & Data Manipulation Packages:**
+   - Silge, J., & Robinson, D. (2016). `tidytext`: Text Mining and Analysis Using Tidy Data Principles in R. *Journal of Open Source Software*, 1(3), 37. \url{https://doi.org/10.21105/joss.00037}.
+   - Wickham, H., et al. (2019). Welcome to the `tidyverse` (`dplyr`, `readr`, `tidyr`, `stringr`, `tibble`, `ggplot2`). *Journal of Open Source Software*, 4(43), 1686.
+5. **Clustering, Sparse Matrices & Network Analysis Packages:**
+   - Bates, D., & Maechler, M. (2025). `Matrix`: Sparse and Dense Matrix Classes and Methods. R package.
+   - Maechler, M., Rousseeuw, P., Struyf, A., Hubert, M., & Hornik, K. (2025). `cluster`: "Finding Groups in Data": Cluster Analysis Extended Rousseeuw et al. R package.
+   - Csardi, G., & Nepusz, T. (2006). The `igraph` software package for complex network research. *InterJournal, Complex Systems*, 1695. \url{https://igraph.org}.
+   - Xie, Y. (2025). `knitr`: A General-Purpose Package for Dynamic Report Generation in R; Zhu, H. (2024). `kableExtra`: Construct Complex Table with 'kable' and Pipe Syntax.

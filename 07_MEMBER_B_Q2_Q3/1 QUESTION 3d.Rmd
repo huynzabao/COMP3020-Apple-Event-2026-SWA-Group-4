@@ -1,0 +1,90 @@
+---
+output:
+  pdf_document:
+    extra_dependencies: ["booktabs", "longtable", "array", "float"]
+header-includes:
+  - \setlength{\emergencystretch}{3em}
+---
+
+```{r q3d-setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.pos = "H", fig.align = "center")
+library(dplyr); library(knitr)
+```
+
+```{r q3d-run, include=FALSE}
+source("B_Q3d_visualisation.R")
+
+f1 <- function(x) formatC(x, format = "f", digits = 1)
+f2 <- function(x) formatC(x, format = "f", digits = 2)
+dg <- setNames(diagnostics$value, diagnostics$item)
+top_load <- function(pc, n = 4, neg = FALSE) {
+  v <- pca$rotation[, pc]; names(sort(if (neg) v else -v))[1:n]
+}
+c2 <- plot_data %>% filter(cluster == 2)
+in_window <- abs(plot_data$PC1) <= 0.15 & abs(plot_data$PC2) <= 0.15
+n_window <- sum(in_window)
+# Term presence for the Cluster 2 replies (from the Q3a count matrix)
+cnt <- q3a$dtm_counts[c2$reply_uri, , drop = FALSE]
+c2_ft <- as.vector(cnt[, "fruit"] > 0 | cnt[, "talking"] > 0)
+c2_ex <- as.vector(cnt[, "fuck"] > 0)
+
+# Guards: every statement in the text is checked against the results.
+stopifnot(
+  all(input_checks$pass), all(pca_checks$pass), all(plot_checks$pass),
+  all(fig_check$pass), nrow(plot_data) == 211,
+  pv[1] + pv[2] < 3,                                  # "only ...%" claims
+  all(c("fruit", "talking") %in% top_load(2)),        # PC2 positive
+  "fuck" %in% top_load(2, neg = TRUE),                # PC2 negative
+  all(c("cosmic", "crisp") %in% top_load(1, 6, neg = TRUE)),  # PC1 negative
+  all(plot_data$PC1[plot_data$cluster == 3] < 0),
+  mean(c2$PC1) > 0, any(c2$PC2 > 0.3), any(c2$PC2 < -0.1),
+  as.numeric(dg[["Correlation of 883-D and 2-D pairwise distances"]]) < 0.05,
+  as.integer(dg[["Replies sharing identical 2-D coordinates (6 dp)"]]) == 20,
+  all(plot_data$cluster[in_window] == 1),
+  n_distinct(plot_data$thread_label[in_window]) == 3,
+  all(c2$PC2[c2_ft & !c2_ex] > 0), all(c2$PC2[c2_ex & !c2_ft] < 0),
+  sum(c2_ft & c2_ex) == 1, abs(c2$PC2[c2_ft & c2_ex]) < 0.05,
+  sum(c2_ft | c2_ex) == nrow(c2)
+)
+```
+
+## Question 3(d): Two-Dimensional Visualisation of Clusters
+
+### Method
+
+The `r nrow(plot_data)` clustered replies were projected into two dimensions by principal component analysis (PCA) of the same `r nrow(X)` $\times$ `r ncol(X)` L2-normalised TF-IDF matrix used for clustering. Before plotting, the matrix, document order, vocabulary and cluster assignments were verified against the saved Question 3(a)--3(c) outputs. PCA centres the matrix, $\tilde{X} = X - \mathbf{1}\bar{\mathbf{x}}^{\top}$, and computes the eigenvectors of the covariance matrix
+
+$$
+S = \frac{1}{n - 1}\,\tilde{X}^{\top}\tilde{X}.
+$$
+
+The first principal component (PC1) is the direction of greatest variance, and PC2 is the direction of greatest remaining variance orthogonal to PC1. Each reply is plotted at its projection onto these two directions. The analysis used `stats::prcomp()` with `center = TRUE` and `scale. = FALSE`. The rows are already of unit length, and rescaling each term to unit variance would inflate the many terms that occur in a single reply. The sign of each component was fixed so that its largest loading is positive, which makes the figure identical across computers.
+
+In the figure, colour shows the k-means cluster from Question 3(c) and shape shows the original discussion thread. The cluster assignments were obtained in the full `r ncol(X)`-dimensional space; PCA is used only for display. Larger clusters are drawn first, points are partly transparent, and no jitter is applied.
+
+### Results
+
+```{r q3d-fig, fig.cap = paste0("K-means clusters (colour) and original discussion threads (shape) of the ", nrow(plot_data), " clustered replies, projected onto the first two principal components of the L2-normalised TF-IDF matrix. PC1 and PC2 together explain ", f1(pv[1] + pv[2]), "\\% of the total variance."), out.width = "100%"}
+include_graphics(f_png)
+```
+
+PC1 explains `r f2(pv[1])`% of the total variance and PC2 explains `r f2(pv[2])`%, so the two components together capture only `r f2(pv[1] + pv[2])`% (Figure \ref{fig:q3d-fig}). All `r nrow(plot_data)` clustered replies are shown; the `r sum(!meta_all$eligible_for_clustering)` zero-feature replies were not clustered and are not plotted.
+
+### Interpretation
+
+The two components are driven largely by the two small clusters. PC1 separates Cluster 3 (negative scores), whose replies share the terms *cosmic* and *crisp*, from Cluster 2 (mostly positive scores). PC2 then spreads Cluster 2 in two directions: the `r sum(c2_ft & !c2_ex)` replies containing *fruit* or *talking* but not the expletive have positive PC2 scores, the `r sum(c2_ex & !c2_ft)` replies containing only the expletive have negative scores, and the one reply containing both lies near zero. This is consistent with the loose, lexical character of Cluster 2 noted in Question 3(c). Cluster 1 forms a dense cloud around the origin: `r n_window` of the `r nrow(plot_data)` replies, all from Cluster 1, lie within $\pm 0.15$ of the origin on both axes. Replies from all three threads appear within this cloud. Some Cluster 1 replies extend towards Cluster 3, but the figure does not show where cluster boundaries lie in the full space.
+
+The visible separation of Clusters 2 and 3 should not be read as evidence of strong cluster structure. The two components were chosen to maximise variance, and in this matrix that variance comes mainly from the same small groups of replies that the clusters isolate. The relationship between clusters and threads is analysed in Question 3(e).
+
+### Limitations
+
+With only `r f2(pv[1] + pv[2])`% of the variance retained, the projection discards most of the information in the TF-IDF matrix. The correlation between pairwise distances in the full space and in the two-dimensional map is only `r dg[["Correlation of 883-D and 2-D pairwise distances"]]`, so replies that appear close may be dissimilar, and vice versa. Because the matrix is sparse, many replies have no weight on either component. As a result, `r dg[["Replies sharing identical 2-D coordinates (6 dp)"]]` replies fall on `r dg[["Distinct coordinate positions occupied by those replies"]]` identical positions, and the dense Cluster 1 cloud hides individual markers. A supplementary enlarged view of this region is provided in `B_Q3d_plot2D_zoom.png`. The large imbalance in cluster sizes (`r paste(table(plot_data$cluster), collapse = ", ")`) and the weak silhouettes reported in Question 3(b) further limit what the figure can show.
+
+\newpage
+### Appendix: R code for Question 3(d)
+
+\small
+```{r q3d-code, eval=FALSE, echo=TRUE, code=readLines("B_Q3d_visualisation.R")}
+```
+\normalsize

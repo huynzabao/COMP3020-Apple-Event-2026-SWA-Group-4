@@ -1,0 +1,9 @@
+Measure,Value
+Intercept,152.229
+Slope (posts per bin),26.426
+95% CI: slope lower,-61.280
+95% CI: slope upper,114.133
+Slope p-value,0.5239
+R-squared,0.0347
+Adjusted R-squared,-0.0458
+Peak 24h post count,"2,308"

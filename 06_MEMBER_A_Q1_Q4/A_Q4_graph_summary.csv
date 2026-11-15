@@ -1,0 +1,2 @@
+n_vertices,n_edges,directed,components_weak,largest_weak_component,page_rank_damping
+153,162,TRUE,2,97,0.85

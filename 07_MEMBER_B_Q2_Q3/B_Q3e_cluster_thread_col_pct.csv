@@ -1,0 +1,5 @@
+cluster,Thread 1,Thread 2,Thread 3
+Cluster 1,90.23,100,93.75
+Cluster 2,6.32,0,6.25
+Cluster 3,3.45,0,0
+Denominator (thread total),174,21,16

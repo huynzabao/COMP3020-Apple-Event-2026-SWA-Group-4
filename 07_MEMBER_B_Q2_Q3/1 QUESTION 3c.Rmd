@@ -1,0 +1,122 @@
+---
+output:
+  pdf_document:
+    extra_dependencies: ["booktabs", "longtable", "array", "float"]
+header-includes:
+  - \setlength{\emergencystretch}{3em}
+---
+
+```{r q3c-setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.pos = "H", fig.align = "center")
+library(dplyr); library(readr); library(stringr); library(knitr); library(kableExtra)
+```
+
+```{r q3c-run, include=FALSE}
+source("B_Q3c_clustering.R")
+
+f3 <- function(x) formatC(x, format = "f", digits = 3)
+f4 <- function(x) formatC(x, format = "f", digits = 4)
+cs <- cluster_summary
+ms <- setNames(model_stats$value, model_stats$statistic)
+tt <- function(c, w) top_terms %>% filter(cluster == c, term == w)
+has_reply <- function(c, pattern) any(str_detect(
+  cluster_replies$reply_text[cluster_replies$cluster == c], fixed(pattern)))
+thread_n <- function(c, lab) sum(assignments$cluster == c &
+                                    assignments$thread_label == lab)
+
+# Guards: every statement in the text is checked against the results.
+stopifnot(
+  k == 3, identical(cs$documents, c(193L, 12L, 6L)),
+  all(consistency$pass), all(reproduction$pass), q3b_sil_check == "MATCH",
+  cs$mean_silhouette[1] < 0, all(cs$mean_silhouette[2:3] > 0.05),
+  all(cs$negative_silhouette[2:3] == 0),
+  ms[["Between / total sum of squares"]] < 0.05,
+  cs$mean_dist_centroid[1] > 0.99,
+  # Cluster 1: low centroid weights, apple is the highest-weight term
+  top_terms$term[top_terms$cluster == 1][1] == "apple",
+  max(top_terms$centroid_weight[top_terms$cluster == 1]) < 0.05,
+  # Cluster 2 evidence
+  tt(2, "fruit")$docs_in_cluster == 6, tt(2, "talking")$docs_in_cluster == 4,
+  tt(2, "talking")$docs_total == 4, tt(2, "fuck")$docs_in_cluster == 5,
+  has_reply(2, "They're clearly talking about fruit."),
+  has_reply(2, "What do you have against fruit?"),
+  # Cluster 3 evidence: every reply contains "cosmic"
+  tt(3, "cosmic")$docs_in_cluster == 6, tt(3, "cosmic")$docs_total == 6,
+  has_reply(3, "Cosmic Crisp apples are a revelation."),
+  thread_n(2, "Thread 1") == 11, thread_n(3, "Thread 1") == 6,
+  # Cluster 1 mixes product (iphone, phone), platform (bluesky) and fruit
+  # (honeycrisp, delicious) vocabulary, each in several replies
+  all(colSums(has_term[cluster == 1, c("iphone", "phone", "bluesky",
+                                       "honeycrisp", "delicious")]) >= 5)
+)
+```
+
+## Question 3(c): Applying the Clustering Method
+
+### Method
+
+K-means clustering was applied to the `r nrow(X)` eligible reply documents. Each reply is represented by its row of the `r nrow(X)` $\times$ `r ncol(X)` TF-IDF matrix from Question 3(a), scaled to unit length (L2 normalisation) as justified in Question 3(b). The `r sum(!all_documents$eligible_for_clustering)` zero-feature documents were not clustered; they remain in the audit table with a missing cluster value.
+
+K-means partitions the documents into $k$ clusters $C_1, \ldots, C_k$ by minimising the within-cluster sum of squares,
+
+$$
+\mathrm{WSS} = \sum_{c=1}^{k} \sum_{i \in C_c} \lVert \mathbf{x}_i - \boldsymbol{\mu}_c \rVert_2^2,
+\qquad \boldsymbol{\mu}_c = \frac{1}{|C_c|} \sum_{i \in C_c} \mathbf{x}_i ,
+$$
+
+where $\mathbf{x}_i$ is the L2-normalised TF-IDF vector of document $i$ and $\boldsymbol{\mu}_c$ is the centroid of cluster $c$. The algorithm starts from $k$ randomly chosen documents as centroids. It then alternates between assigning each document to its nearest centroid and recomputing each centroid as the mean of its documents, until no reassignment reduces WSS or the iteration limit is reached. The Hartigan--Wong algorithm used by `stats::kmeans` refines this by moving a document to another cluster whenever the move lowers WSS. Because a single run can stop at a local minimum, the procedure is repeated from many random starts and the solution with the lowest WSS is kept.
+
+For unit vectors, the squared Euclidean distance between two documents equals $2(1 - \cos\theta_{ij})$, so distances between documents reflect cosine similarity. Centroids, however, are averages and are generally shorter than unit length, so the objective is not identical to spherical k-means, which re-normalises centroids and maximises cosine similarity directly.
+
+All settings were read from the saved Question 3(b) configuration: $k = `r k`$, the `r algo` algorithm, `nstart` = `r nstart`, `iter.max` = `r iter_max` and random seed `r seed` (the seed that gave the lowest WSS among the 20 seeds evaluated in Question 3(b)). Before fitting, the input was verified to contain the same `r nrow(X)` documents, in the same order, and the same `r ncol(X)` terms as Question 3(a). The fitted model reproduced the Question 3(b) reference solution exactly: all `r nrow(X)` assignments matched (adjusted Rand index = 1), and WSS matched to within $10^{-10}$.
+
+### Results
+
+```{r q3c-table}
+tot <- tibble(cluster = "Total", documents = sum(cs$documents),
+              share_pct = 100, wss = sum(cs$wss),
+              mean_dist_centroid = mean(dist_centroid),
+              mean_silhouette = mean(sil_w),
+              negative_silhouette = sum(sil_w < 0))
+bind_rows(cs %>% mutate(cluster = as.character(cluster)) %>%
+            select(names(tot)), tot) %>%
+  transmute(Cluster = cluster, Documents = documents,
+            `Share (%)` = formatC(share_pct, format = "f", digits = 1),
+            WSS = formatC(wss, format = "f", digits = 2),
+            `Mean distance to centroid` = f3(mean_dist_centroid),
+            `Mean silhouette` = f4(mean_silhouette),
+            `Negative silhouettes` = negative_silhouette) %>%
+  kable(format = "latex", booktabs = TRUE, linesep = "", align = "lrrrrrr",
+        label = "q3c-summary",
+        caption = paste0("Summary of the k-means solution (k = ", k,
+                         ", L2-normalised TF-IDF, ", nrow(X),
+                         " documents). Distances and silhouettes use ",
+                         "Euclidean distance on the normalised vectors.")) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 9) %>%
+  row_spec(k, hline_after = TRUE)
+```
+
+Cluster 1 contains `r cs$share_pct[1]`% of the documents (Table \ref{tab:q3c-summary}). Its mean silhouette is slightly negative, and `r cs$negative_silhouette[1]` of its `r cs$documents[1]` members are, on average, closer to another cluster than to their own. Its documents lie at a mean distance of `r f3(cs$mean_dist_centroid[1])` from the centroid, close to the value of 1 expected for a unit vector that shares almost no terms with the cluster centroid. Clusters 2 and 3 are smaller and more compact, and none of their members has a negative silhouette. Overall, the partition accounts for only `r round(100 * ms[["Between / total sum of squares"]], 1)`% of the total sum of squares (between-cluster divided by total), and the mean silhouette is `r f4(mean(sil_w))`.
+
+### Interpretation
+
+Ranking terms by their centroid weight and checking how many replies contain each term (`B_Q3c_top_terms_by_cluster.csv`) gives the following descriptions:
+
+- **Cluster 1** (`r cs$documents[1]` replies) has no coherent topic. Its highest-weight term, *apple*, has a centroid weight of only `r f3(tt(1, "apple")$centroid_weight)`, and the cluster combines replies about the product (*iphone*, *phone*), the platform (*bluesky*) and the fruit (*honeycrisp*, *delicious*) with unrelated replies. It acts as a residual group of replies that share little vocabulary with one another.
+- **Cluster 2** (`r cs$documents[2]` replies) groups short reactions that share the terms *fruit* (`r tt(2, "fruit")$docs_in_cluster` replies), *talking* (`r tt(2, "talking")$docs_in_cluster`) or an expletive (`r tt(2, "fuck")$docs_in_cluster`). These include expressions of confusion or dismissal and remarks about the fruit reading of the post, for example "They're clearly talking about fruit." and "What do you have against fruit?". The grouping is lexical and only loosely thematic.
+- **Cluster 3** (`r cs$documents[3]` replies) is the most coherent: every reply mentions the Cosmic Crisp apple variety, for example "Cosmic Crisp apples are a revelation."
+
+Both small clusters consist almost entirely of Thread 1 replies (`r thread_n(2, "Thread 1")` of `r cs$documents[2]` and `r thread_n(3, "Thread 1")` of `r cs$documents[3]`); the full comparison with the original threads is given in Question 3(e). The solution therefore separates two small groups with shared vocabulary from a large, unstructured remainder; it does not show three well-separated themes.
+
+### Limitations
+
+The clusters are weakly separated, as shown by the near-zero silhouettes and the small share of variation explained. Because the TF-IDF vectors are sparse and high-dimensional, most replies share no terms, so their distances to every centroid are similar and their assignment is fragile. K-means assumes compact clusters of comparable spread and assigns every document to some cluster, even when it fits none. The replies are unevenly distributed across threads, so the vocabulary of Thread 1 dominates. Finally, the result depends on the representation and on the selected $k$, which Question 3(b) showed to be sensitive to the micro-cluster rule.
+
+\newpage
+### Appendix: R code for Question 3(c)
+
+\small
+```{r q3c-code, eval=FALSE, echo=TRUE, code=readLines("B_Q3c_clustering.R")}
+```
+\normalsize

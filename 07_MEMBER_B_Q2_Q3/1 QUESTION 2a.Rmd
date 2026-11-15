@@ -1,0 +1,82 @@
+---
+output:
+  pdf_document:
+    extra_dependencies: ["booktabs", "longtable", "array", "float"]
+header-includes:
+  - \setlength{\emergencystretch}{3em}
+---
+
+```{r q2a-setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(dplyr); library(readr); library(stringr); library(knitr); library(kableExtra)
+```
+
+```{r q2a-run, include=FALSE}
+source("B_Q2a_select_top3.R")
+
+fmt <- function(x) format(x, big.mark = ",")
+latex_escape <- function(x) {
+  x <- gsub("\\\\", "\\\\textbackslash{}", x)
+  x <- gsub("([%&#_$])", "\\\\\\1", x)
+  x <- gsub("\\{", "\\\\{", x); x <- gsub("\\}", "\\\\}", x)
+  x <- gsub("~", "\\\\textasciitilde{}", x)
+  gsub("\\^", "\\\\textasciicircum{}", x)
+}
+q2a <- read_csv("outputs_B/B_Q2a_top3_posts.csv", show_col_types = FALSE,
+                locale = locale(encoding = "UTF-8"))
+r   <- r_counts
+n_explicit <- sum(str_starts(review_candidates$content_assessment, "Explicit"))
+
+status_sentence <- switch(status_state,
+  match       = "These counts match the handoff status file.",
+  not_checked = "The handoff status file was not available for an automatic count check.",
+  mismatch    = "WARNING: these counts differ from the handoff status file.")
+handoff_sentence <- if (handoff_match) {
+  "The result is identical to the team handoff file in URIs, order, text, author, period and engagement counts."
+} else {
+  "WARNING: the result differs from the team handoff file."
+}
+```
+
+## Question 2(a): Selection of the three most-replied-to posts
+
+**Method.** Threads were selected from the Question 1 topic dataset, which contains `r fmt(validation$value[1])` posts labelled as event-related (`r fmt(validation$value[2])` Before and `r fmt(validation$value[3])` After). `r status_sentence` Posts were ranked by `reply_count`, the reply count reported by the Bluesky API at collection time. Likes and then the post URI were used as tie-breakers, but `r if (tie_at_boundary) "a tie occurred" else "no tie occurred"` at the third position (`r r[3]` versus `r r[4]` replies). `r handoff_sentence` Each selected post and its replies form one discussion thread (T1 to T3).
+
+```{r q2a-table-metrics}
+q2a %>%
+  select(Thread, Author, Period, `Created (UTC)`, Replies, Likes, Reposts,
+         `Label source`) %>%
+  kable(format = "latex", booktabs = TRUE, format.args = list(big.mark = ","),
+        caption = paste("The three most-replied-to posts in the Question 1 topic",
+                        "dataset (n = 4,536). Engagement counts as reported by the",
+                        "Bluesky API at collection time.")) %>%
+  kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+```{r q2a-table-text}
+q2a %>%
+  mutate(Text = latex_escape(Text), URL = paste0("\\url{", URL, "}")) %>%
+  select(Thread, Text, URL) %>%
+  kable(format = "latex", booktabs = TRUE, escape = FALSE,
+        caption = "Original text and Bluesky URL of the three selected posts.") %>%
+  kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 8) %>%
+  column_spec(1, width = "1.1cm") %>%
+  column_spec(2, width = "7.2cm") %>%
+  column_spec(3, width = "6.6cm")
+```
+
+**Results and relevance.** T1 received `r r[1]` replies, `r round(r[1] / r[2], 1)` times as many as T2 (`r r[2]`) and `r round(r[1] / r[3], 1)` times as many as T3 (`r r[3]`). T1 is the only Before-period post. The account `bsky.app` posted it two hours before the 17:00 UTC cut-off between the two periods, and its text refers to "today's Apple event". T2 and T3 were posted after the event and mention the iPhone Duo.
+
+All three posts were included by the keyword rules (`label_source = rule_based`). No `manual_event_label` is recorded for any of them, even though `r validation$value[9]` topic posts carry a recorded human label. A provisional content inspection by Owner B, which is not recorded as a label, confirms that each text explicitly mentions the Apple event or the iPhone Duo. The intent of T1 is nevertheless ambiguous. A later post by the same account inside the thread refers to the Honeycrisp apple variety. One reply within the thread reads: "They're talking about the fruit. It's a joke thread."^[Reply URI: \url{`r quote_check$reply_uri[1]`}] The selected threads are therefore the most-replied-to posts that reference the event. They are not necessarily the most substantive product discussions.
+
+**Limitations.** Reply counts are API snapshots from a sample that depends on the search queries, not a census of Bluesky. The retrieved English-declared replies (`r paste(thread_replies$retrieved_replies, collapse = ", ")` for T1 to T3) include nested replies and exclude empty or non-English-declared replies. They therefore differ from `reply_count`; Question 2(b) uses the retrieved replies.
+
+The selection also depends on the Question 1 relevance rules. A total of `r nrow(review_candidates)` posts outside the topic dataset have at least `r r[3]` replies (listed in `B_Q2a_review_candidates.csv`). Provisional inspection found that `r n_explicit` of them explicitly refer to the event or the announcement. Relabelling those posts would replace T3 with `r sub("^.*; ", "", scenarios$top3[2])` and leave T1 unchanged. The current labels are retained until the group confirms these readings.
+
+\newpage
+### Appendix: R code for Question 2(a)
+
+\small
+```{r q2a-code, eval=FALSE, echo=TRUE, code=readLines("B_Q2a_select_top3.R")}
+```
+\normalsize

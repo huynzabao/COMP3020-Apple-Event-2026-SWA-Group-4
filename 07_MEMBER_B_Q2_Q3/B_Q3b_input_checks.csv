@@ -1,0 +1,26 @@
+check,value
+1. Documents in full reply population (matrix rows),229
+1b. Documents in metadata,229
+2. Vocabulary columns,883
+2b. Vocabulary rows in vocabulary table,883
+3. Clustering-input rows (eligible),211
+4. Zero-feature documents in metadata,18
+4b. All-zero rows in full matrix,18
+5. Input rows matching eligible reply_uri in order (1 = yes),1
+6. Documents without thread_label,0
+7. Non-finite or negative TF-IDF values,0
+8. Duplicate document identifiers,0
+"9. RDS 08-file MD5 equals current 08 file (1 = yes, NA = file absent)",1
+"9b. RDS vocabulary equals Q3a summary CSV (1 = yes, NA = CSV absent)",1
+9c. Q3a RDS built with fixed ICU tokeniser locale en_AU (1 = yes),1
+9d. Tokenisation regression: 'mu.social' is one term (1 = yes),1
+"9e. Input columns identical to Q3a vocabulary, same order (1 = yes)",1
+10. Clustering input equals eligible rows of full matrix (1 = yes),1
+Document pairs,22155
+Pairs with no shared term (cosine = 0),20048
+Share of orthogonal pairs (%),90.49
+Mean pairwise cosine,0.0062
+Documents orthogonal to all others,18
+Raw TF-IDF row norm: min,0.9161
+Raw TF-IDF row norm: max,5.3519
+Dense matrix size (MB),1.51

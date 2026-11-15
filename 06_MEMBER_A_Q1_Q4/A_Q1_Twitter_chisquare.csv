@@ -1,0 +1,2 @@
+name,N_before,N_after,X_before_subtopic,Y_after_subtopic,before_prop,after_prop,expected_after_yes_from_before,expected_after_no_from_before,twitter_chi_square,pearson_chi_square_for_comparison,trend_direction,note
+Twitter chi-square trend score (scaled past proportions),468,4068,84,2552,0.1794871794871795,0.6273352999016716,730.1538461538462,3337.846153846154,5540.177149178255,345.8297478637523,increasing share,DESCRIPTIVE score. Before observations are sampled; do not report a Twitter-score p-value.

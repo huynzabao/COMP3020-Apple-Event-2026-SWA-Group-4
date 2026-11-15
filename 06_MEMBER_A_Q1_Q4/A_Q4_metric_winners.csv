@@ -1,0 +1,4 @@
+metric,author_did,handle_if_known,score,tied_top_nodes,is_top3_active
+in_degree,did:plc:nxmjxl2wiyat43p3gikkt37w,appleinsider.com,49,1,TRUE
+out_degree,did:plc:m2yuqynl2cttvi4k5453yegh,feed.igeek.gamer-geek-news.com.ap.brid.gy,37,1,TRUE
+page_rank,did:plc:nxmjxl2wiyat43p3gikkt37w,appleinsider.com,0.12674293999200761,1,TRUE

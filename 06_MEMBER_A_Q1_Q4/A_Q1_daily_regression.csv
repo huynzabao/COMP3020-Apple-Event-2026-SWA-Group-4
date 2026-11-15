@@ -1,0 +1,2 @@
+model,intercept,slope_posts_per_day,slope_ci95_lower,slope_ci95_upper,slope_p_value,r_squared,adjusted_r_squared,n_bins,before_total,after_total,peak_day_index,peak_retrieved_posts
+Retrieved topic posts per 24h bin ~ day_index,152.2285714285716,26.426373626373607,-61.27994377521212,114.13269102795932,0.5239001485540211,0.03466953396433923,-0.04577467153863246,14,468,4068,7,2308

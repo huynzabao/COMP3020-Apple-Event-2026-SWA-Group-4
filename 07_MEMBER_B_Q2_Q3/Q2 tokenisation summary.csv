@@ -1,0 +1,4 @@
+thread,root_uri,api_reply_count,retrieved_replies_log,replies_analysed,replies_zero_tokens,replies_short_lt15_chars,replies_by_root_author,replies_possible_non_english,raw_tokens,retained_tokens,distinct_words,cutoff_n,tied_in_top15,tied_outside_top15,snapshot_created_utc,replies_file_md5
+T1,at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3mv3shqdfuc2e,117,209,187,13,26,1,2,2327,1209,769,6,3,2,2026-11-11T06:36:24Z,57c2cac7efff3f17fd8ec9d2ab230869
+T2,at://did:plc:vrp4wqnrmwkxgrlfqpt2ukhk/app.bsky.feed.post/3mv6bqi7v6s2g,31,33,26,5,7,1,0,233,123,105,1,4,90,2026-11-11T06:36:24Z,57c2cac7efff3f17fd8ec9d2ab230869
+T3,at://did:plc:47im5i5ptau2br4rh7lp2ryr/app.bsky.feed.post/3mv45scmhhp27,18,16,16,0,2,0,0,185,99,85,1,5,70,2026-11-11T06:36:24Z,57c2cac7efff3f17fd8ec9d2ab230869

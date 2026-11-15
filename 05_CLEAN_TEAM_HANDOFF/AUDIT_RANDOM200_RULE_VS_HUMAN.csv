@@ -1,0 +1,7 @@
+period,auto_event_label,manual_event_label,n
+After,include,exclude,3
+After,include,include,86
+After,uncertain,exclude,1
+After,uncertain,include,5
+Before,include,include,77
+Before,uncertain,include,17

@@ -1,0 +1,5 @@
+Metric,Account,DID,Score
+In-degree,appleinsider.com,did:plc:nxmjxl2wiyat43p3gikkt37w,49
+Out-degree,feed.igeek.gamer-geek-news.com.ap.brid.gy,did:plc:m2yuqynl2cttvi4k5453yegh,37
+PageRank,appleinsider.com,did:plc:nxmjxl2wiyat43p3gikkt37w,0.12674293999200761
+Total degree,feed.igeek.gamer-geek-news.com.ap.brid.gy,did:plc:m2yuqynl2cttvi4k5453yegh,77

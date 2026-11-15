@@ -1,0 +1,113 @@
+---
+output:
+  pdf_document:
+    extra_dependencies: ["booktabs", "longtable", "array", "float"]
+header-includes:
+  - \setlength{\emergencystretch}{3em}
+---
+
+```{r q3a-setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.pos = "H", fig.align = "center")
+library(dplyr); library(readr); library(stringr); library(knitr); library(kableExtra)
+```
+
+```{r q3a-run, include=FALSE}
+source("B_Q3a_tfidf.R")
+
+fmt <- function(x) format(x, big.mark = ",")
+ms  <- setNames(matrix_summary$value, matrix_summary$metric)
+ts  <- thread_summary
+zr  <- zero_feature_docs %>% count(exclusion_reason)
+zn  <- function(r) sum(zr$n[zr$exclusion_reason == r])
+ve  <- function(w) vocabulary %>% filter(term == w)
+n_docs  <- nrow(dtm_tfidf); n_terms <- ncol(dtm_tfidf); n_elig <- sum(elig)
+n_df1   <- sum(vocabulary$doc_freq == 1)
+elig_meta <- doc_meta %>% filter(eligible_for_clustering)
+iso_docs <- sum(rowSums(dtm_counts[elig, vocabulary$doc_freq >= 2,
+                                   drop = FALSE]) == 0)
+l2 <- sqrt(rowSums(dtm_tfidf[elig, ]^2))
+
+stopifnot(
+  n_docs == 229, n_elig == 211, N_idf == n_elig,
+  identical(ts$zero_token_docs, ts$zero_feature_docs),
+  vocabulary$term[which.min(vocabulary$idf)] == "apple",
+  ve("apple")$n_threads == 3, ve("apples")$doc_freq_T2 == 0,
+  ve("apples")$doc_freq_T3 == 0,
+  zn("No word tokens (emoji or punctuation only)") +
+    zn("No word tokens after URL/mention removal") +
+    zn("All tokens are stopwords or single characters") == sum(!elig),
+  all(zero_feature_docs$thread %in% c("T1", "T2"))
+)
+```
+
+## Question 3(a): Text Preprocessing and TF-IDF Document Term Matrix
+
+### Method
+
+The document collection is `08_Q3_UNIQUE_REPLY_DOCUMENTS.csv`, which combines the replies to the three posts selected in Question 2(a). Each unique `reply_uri` is one document, and `root_uri` and `thread_label` are retained for later comparison with the clusters. The file contains `r n_docs` documents (T1: `r ts$documents[1]`, T2: `r ts$documents[2]`, T3: `r ts$documents[3]`). It has no duplicate identifiers or blank texts, and its reply URIs, root URIs and texts are identical to the Question 2 reply file, so Questions 2 and 3 analyse the same reply population.
+
+Preprocessing reused the Question 2(b) pipeline without modification: apostrophes were standardised, URLs and user mentions were removed, the `#` symbol was removed from hashtags, and text was lower-cased. Text was tokenised with `tidytext::unnest_tokens()`, Snowball English stopwords and the same `r nrow(custom_sw)` custom stopwords were removed, possessive *'s* was stripped, and single-character tokens were removed. No stemming, lemmatisation or document-frequency threshold was applied. Keeping the Question 2(b) rules unchanged ensures that the word frequencies and the clusters rest on the same tokens.
+
+Term counts $n_{t,d}$ were weighted with `tidytext::bind_tf_idf()`, which computes
+
+$$
+\mathrm{tf}(t,d) = \frac{n_{t,d}}{\sum_{t'} n_{t',d}}, \qquad
+\mathrm{idf}(t) = \ln\frac{N}{\mathrm{df}_t}, \qquad
+\text{tf-idf}(t,d) = \mathrm{tf}(t,d)\times\mathrm{idf}(t),
+$$
+
+where $\mathrm{df}_t$ is the number of documents containing term $t$ and $N$ is the number of documents with at least one retained token ($N = `r N_idf`$). Term frequency is therefore normalised by document length, and IDF uses the natural logarithm without smoothing. The weights were stored in a sparse matrix (`Matrix::dgCMatrix`) whose rows are ordered by thread and then by `reply_uri`.
+
+### Results
+
+The TF-IDF document-term matrix has `r n_docs` rows and `r fmt(n_terms)` columns (Table \ref{tab:q3a-dtm}). It contains `r fmt(nnz)` nonzero entries, giving a sparsity of `r ms[["Sparsity, full matrix (%)"]]`%. An eligible document has a median of `r ms[["Median nonzero features per eligible document"]]` nonzero features (maximum `r ms[["Max nonzero features per document"]]`). Of the `r fmt(n_terms)` terms, `r n_df1` (`r round(100 * n_df1 / n_terms)`%) occur in only one document. The term with the lowest IDF is *apple* (df = `r ve("apple")$doc_freq`, idf = `r round(ve("apple")$idf, 2)`), which occurs in all three threads; only `r sum(vocabulary$n_threads == 3)` terms are shared by all three threads. All weights are finite and nonnegative, and no term occurs in every document.
+
+```{r q3a-table}
+per_thread_terms <- c(sum(vocabulary$doc_freq_T1 > 0), sum(vocabulary$doc_freq_T2 > 0),
+                      sum(vocabulary$doc_freq_T3 > 0))
+per_thread_nnz <- tapply(rowSums(dtm_tfidf != 0), doc_meta$thread, sum)
+tab <- tibble(
+  Measure = c("Reply documents (matrix rows)", "Zero-feature documents",
+              "Documents eligible for clustering", "Retained tokens",
+              "Distinct terms", "Nonzero TF-IDF entries"),
+  T1 = c(ts$documents[1], ts$zero_feature_docs[1], ts$eligible_docs[1],
+         ts$retained_tokens[1], per_thread_terms[1], per_thread_nnz[["T1"]]),
+  T2 = c(ts$documents[2], ts$zero_feature_docs[2], ts$eligible_docs[2],
+         ts$retained_tokens[2], per_thread_terms[2], per_thread_nnz[["T2"]]),
+  T3 = c(ts$documents[3], ts$zero_feature_docs[3], ts$eligible_docs[3],
+         ts$retained_tokens[3], per_thread_terms[3], per_thread_nnz[["T3"]]),
+  `All threads` = c(n_docs, sum(!elig), n_elig, sum(ts$retained_tokens),
+                    n_terms, nnz)
+)
+stopifnot(sum(per_thread_nnz) == nnz)
+kable(tab, format = "latex", booktabs = TRUE, linesep = "",
+      format.args = list(big.mark = ","),
+      label = "q3a-dtm",
+      caption = paste0("Composition of the TF-IDF document-term matrix (",
+                       n_docs, " documents $\\times$ ", fmt(n_terms),
+                       " terms; sparsity ", ms[["Sparsity, full matrix (%)"]],
+                       "\\%). Distinct terms per thread overlap, so they do ",
+                       "not sum to the vocabulary size."), escape = FALSE) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 9)
+```
+
+### Data handling
+
+The total population of `r n_docs` documents all have nonempty original text, but `r sum(!elig)` (T1: `r ts$zero_feature_docs[1]`, T2: `r ts$zero_feature_docs[2]`, T3: `r ts$zero_feature_docs[3]`) retain no token after preprocessing: `r zn("No word tokens (emoji or punctuation only)")` consist only of emoji or punctuation, `r zn("No word tokens after URL/mention removal")` consists only of a URL, and `r zn("All tokens are stopwords or single characters")` contain only stopwords or single characters. These are the same `r sum(!elig)` replies identified in Question 2(b). Because a document without tokens has no nonzero weight, the zero-token and zero-feature documents coincide.
+
+These rows remain in the `r n_docs`-row matrix so that the reply population stays complete and traceable, and they are listed with their exclusion reasons in `B_Q3a_zero_feature_documents.csv`. They cannot be clustered meaningfully: an all-zero vector has no direction, so its cosine similarity to any document is undefined, and under Euclidean distance all such rows coincide at the origin, so any cluster assignment would reflect the absence of text rather than its content. The clustering input for Questions 3(b)--3(e) is therefore the `r n_elig` $\times$ `r fmt(n_terms)` submatrix of eligible documents. `B_Q3a_document_metadata.csv` maps every matrix row to its `reply_uri`, `root_uri`, original `thread_label`, eligibility status and exclusion reason.
+
+### Limitations
+
+Replies are short, so the matrix is extremely sparse and most terms are unique to one document. `r iso_docs` eligible documents contain only such terms and therefore share no vocabulary with any other document. In addition, the TF-IDF vector length varies widely (Euclidean norm `r round(min(l2), 2)`--`r round(max(l2), 2)`), because a short reply with one rare term receives the maximum weight $\ln N$. Both properties can affect distance-based clustering and must be considered in Question 3(b).
+
+The threads are unequal in size: T1 provides `r round(100 * ts$eligible_docs[1] / n_elig)`% of the eligible documents, so the IDF weights largely reflect T1's vocabulary. Preprocessing also discards emoji, word order and negation, and the absence of stemming keeps inflected forms such as *apple* and *apples* as separate features.
+
+\newpage
+### Appendix: R code for Question 3(a)
+
+\small
+```{r q3a-code, eval=FALSE, echo=TRUE, code=readLines("B_Q3a_tfidf.R")}
+```
+\normalsize

@@ -1,0 +1,4 @@
+thread,quote,reply_uri,primary_code,verified_verbatim,illustrates
+T1,The only apple product I buy is a fruit.,at://did:plc:bks24rjhxyuezh4cx5gvzj6m/app.bsky.feed.post/3mv3upxoqz22q,apple_company_criticism,TRUE,"T1 replies play on the company/fruit ambiguity, often while rejecting Apple"
+T2,Got mine on Temu.,at://did:plc:ardqqwoj2naqz6ahllphskrf/app.bsky.feed.post/3mv6qmsws7c2m,apple_product_or_event,TRUE,T2 replies mock the device shown as a cheap or makeshift product
+T3,Isn't it cute how apple comes up with all these innovations 7 years after Samsung?,at://did:plc:nt3t5co4ntjgwqh7v6t226tp/app.bsky.feed.post/3mv4a7rdl3c2m,apple_product_or_event,TRUE,T3 replies criticise the foldable as late relative to competitors

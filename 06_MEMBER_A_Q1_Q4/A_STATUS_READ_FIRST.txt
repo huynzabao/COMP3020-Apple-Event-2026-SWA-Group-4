@@ -1,0 +1,15 @@
+MEMBER A | Q1+Q4 | EXECUTION STATUS
+Run: /Users/baohuynh/Desktop/Stage 2/Data/SWA/APPLE_EVENT_2026/APPLE_EVENT_2026_RUN_20261028_045034
+Input folder: /Users/baohuynh/Desktop/Stage 2/Data/SWA/APPLE_EVENT_2026/APPLE_EVENT_2026_RUN_20261028_045034/05_CLEAN_TEAM_HANDOFF
+Output folder: /Users/baohuynh/Desktop/Stage 2/Data/SWA/APPLE_EVENT_2026/APPLE_EVENT_2026_RUN_20261028_045034/06_MEMBER_A_Q1_Q4
+Q1 posts: 4536
+Before yes/no: 84 384
+After yes/no: 2552 1516
+Pearson Chi-square: 345.8297
+Pearson p-value: < 2.2e-16
+Twitter Chi-square score: 5540.177
+Daily OLS slope: 26.4264 R2: 0.0347
+Top3 topic authors: technology-news.bsky.social, appleinsider.com, feed.igeek.gamer-geek-news.com.ap.brid.gy
+Q4 network status: REUSE_OK
+Human event review count: 200
+IMPORTANT: Auto-label analysis is PROVISIONAL until review. No API calls were made.

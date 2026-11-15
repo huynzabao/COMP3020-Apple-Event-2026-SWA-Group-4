@@ -1,0 +1,161 @@
+---
+output:
+  pdf_document:
+    extra_dependencies: ["booktabs", "longtable", "array", "float"]
+header-includes:
+  - \setlength{\emergencystretch}{3em}
+---
+
+```{r q2b-setup, include=FALSE} 
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.pos = "H", out.width = "74%", fig.align = "center")
+library(dplyr); library(readr); library(stringr); library(knitr); library(kableExtra)
+```
+
+```{r q2b-run, include=FALSE}
+source("B_Q2_text.R")
+
+fmt <- function(x) format(x, big.mark = ",")
+ts  <- tokenisation_summary
+wf  <- function(th, w) word_freq %>% filter(thread == th, word == w)
+cap <- function(i) {
+  s <- ts[i, ]
+  paste0("Top 15 words in the replies of thread T", i, " (", s$replies_analysed,
+         " replies analysed, ", fmt(s$retained_tokens), " tokens after ",
+         "preprocessing). Lighter bars share the 15th-ranked frequency with ",
+         s$tied_outside_top15, " further word(s) not shown.")
+}
+n_sw_snow <- length(snowball_sw)
+n_sw_cust <- nrow(custom_sw)
+log_clause <- if (all(!is.na(ts$retrieved_replies_log))) {
+  paste0(" and from the numbers of replies recorded in the retrieval log (",
+         paste(ts$retrieved_replies_log, collapse = ", "), ")")
+} else ""
+
+# Guard: every factual statement in "Brief descriptive observations" is checked
+# here, so the text cannot silently disagree with the data after a rerun.
+stopifnot(
+  wf("T1", "apple")$rank == 1, wf("T1", "apples")$rank == 2,
+  wf("T1", "blah")$n_replies == 1,
+  all(c("fruit", "delicious", "honeycrisp", "cosmic", "iphone", "product",
+        "company", "bluesky") %in% top15$word[top15$thread == "T1"]),
+  all(c("apple", "like", "looks", "phone", "2000") %in%
+        top15$word[top15$thread == "T2" & top15$n >= 2]),
+  sum(word_freq$thread == "T3" & word_freq$n > 2) == 1,
+  wf("T3", "apple")$rank == 1,
+  all(sapply(c("fight", "folks", "maga"), function(w) wf("T3", w)$n_replies) == 1),
+  all(ts$cutoff_n[2:3] == 1),
+  sum(reply_flags$possible_non_english) == 2,
+  all(reply_flags$thread[reply_flags$possible_non_english] == "T1")
+)
+
+# Zero-token replies and stopword sensitivity (values used in the text)
+zt  <- count(zero_token_replies, reason)
+ztn <- function(x) sum(zt$n[zt$reason == x])
+t2_zero <- zero_token_replies %>% filter(thread == "T2")
+laugh <- "^[\U0001F602\U0001F923]+$"     # face with tears of joy / rolling
+sens <- stopword_sensitivity
+t1_only_final <- strsplit(sens$only_final_list[1], ", ")[[1]]
+stopifnot(
+  nrow(t2_zero) == ts$replies_zero_tokens[2],
+  all(t2_zero$reason == "Emoji or symbols only"),
+  all(str_detect(t2_zero$reply_text, laugh)),
+  ztn("URL only") == 1,
+  str_detect(zero_token_replies$reply_text[zero_token_replies$reason == "URL only"],
+             "Honeycr"),
+  all(c("product", "company", "bluesky") %in% t1_only_final),
+  sens$words_in_both[2] == 14, sens$words_in_both[3] == 14
+)
+```
+
+## Question 2(b): Word frequency analysis
+
+### Method
+
+The replies analysed are those in `07_Q2_REPLIES_ENGLISH_BY_THREAD.csv`. Each reply is assigned to T1--T3 through its `root_uri`, which matches the three posts selected in Question 2(a). The file contains `r nrow(replies)` non-empty, English-declared replies, distributed as `r ts$replies_analysed[1]` for T1, `r ts$replies_analysed[2]` for T2 and `r ts$replies_analysed[3]` for T3. It contains no duplicate reply URIs, and its reply set and text are identical to those of the Question 3 document file. These retained counts differ from the API-reported reply counts (`r paste(ts$api_reply_count, collapse = ", ")`)`r log_clause`. The retrieved sets include nested replies, and blank or non-English-declared replies were removed during cleaning. No further replies were excluded for Question 2(b).
+
+Preprocessing was applied to the original reply text, and each token was kept linked to its reply and thread (`B_Q2_tokens.csv`). The steps were:
+
+- straight and curly apostrophes were standardised;
+- URLs, including truncated links, and user mentions were removed;
+- the `#` symbol was removed from hashtags, keeping the word;
+- text was converted to lower case.
+
+The text was then tokenised into words with `tidytext::unnest_tokens()`. This step removes punctuation and emoji, and keeps contractions and numbers such as *2000* as tokens.
+
+Stopwords were removed using the Snowball English list (`r n_sw_snow` words) plus `r n_sw_cust` custom words:
+
+- **Modal auxiliaries missing from Snowball:** *can*, *will*, *might*, *must*, *may* and *shall*. Snowball already contains *could*, *would* and *should*.
+- **Adverbs and intensifiers with no topical content:** *just*, *now*, *much*, *also*, *even*, *actually*, *really* and *still*.
+
+Possessive *'s* was then stripped, and single-character tokens were removed. Product and brand names were retained, and no stemming was applied, so *apple* and *apples* remain distinct words.
+
+Frequency is the total number of occurrences of a word in a thread, not the number of replies containing it. Ties were ordered by the number of replies containing the word and then alphabetically.
+
+A total of `r nrow(zero_token_replies)` replies retained no tokens (Table 1). Inspection of their original text shows they comprise:
+
+- `r ztn("Emoji or symbols only")` emoji-only reactions, including all `r nrow(t2_zero)` in T2, which consist solely of laughing-face emoji;
+- `r ztn("Stopwords or single characters only")` one-word questions (*so?*, *...what?*);
+- `r ztn("Mention plus stopwords")` reply containing only a user mention and stopwords;
+- `r ztn("URL only")` reply consisting solely of a Wikipedia link about the Honeycrisp apple.
+
+They remain in the reply counts and are listed in `B_Q2_zero_token_replies.csv`.
+
+As a sensitivity check, the top 15 was recomputed with the Snowball list alone. For T2 and T3, `r sens$words_in_both[2]` and `r sens$words_in_both[3]` of the 15 words are unchanged; the only differences are among words tied at the cut-off. For T1, `r sens$words_in_both[1]` words are unchanged. With Snowball alone, *`r gsub(", ", "*, *", sens$only_snowball_list[1])`* replace *`r gsub(", ", "*, *", sens$only_final_list[1])`* (`B_Q2_stopword_sensitivity.csv`).
+
+```{r q2b-summary-table}
+ts %>%
+  transmute(Thread = thread,
+            `API reply count` = api_reply_count,
+            `Replies analysed` = replies_analysed,
+            `Replies with no retained tokens` = replies_zero_tokens,
+            `Tokens before stopword removal` = raw_tokens,
+            `Tokens retained` = retained_tokens,
+            `Distinct words` = distinct_words,
+            `15th-ranked frequency` = cutoff_n,
+            `Words tied outside top 15` = tied_outside_top15) %>%
+  kable(format = "latex", booktabs = TRUE, format.args = list(big.mark = ","),
+        caption = "Reply and token counts for the three threads.") %>%
+  kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9) %>%
+  column_spec(2:9, width = "1.45cm")
+```
+
+### Results
+
+```{r q2b-fig1, fig.cap = cap(1)}
+include_graphics("outputs_B/B_Q2_fig_thread1.png")
+```
+
+```{r q2b-fig2, fig.cap = cap(2)}
+include_graphics("outputs_B/B_Q2_fig_thread2.png")
+```
+
+```{r q2b-fig3, fig.cap = cap(3)}
+include_graphics("outputs_B/B_Q2_fig_thread3.png")
+```
+
+### Brief descriptive observations
+
+In T1, *apple* is the most frequent word (`r wf("T1","apple")$n` occurrences in `r wf("T1","apple")$n_replies` replies), followed by *apples* (`r wf("T1","apples")$n`). Fruit-related terms (*fruit*, *delicious*, *honeycrisp*, *cosmic*) appear alongside product and platform terms (*iphone*, *product*, *company*, *bluesky*). Of these, *product*, *company* and *bluesky* enter the top 15 only after the custom stopwords are removed. The count for *blah* (`r wf("T1","blah")$n`) comes from a single reply.
+
+In T2, the highest frequency is only `r max(top15$n[top15$thread == "T2"])`. The most frequent words include *apple*, *like*, *looks*, *phone* and *2000*.
+
+In T3, *apple* (`r wf("T3","apple")$n`) is the only word occurring more than twice. It is followed by *foldable*, *huge* and *phone(s)*. The counts for *fight*, *folks* and *maga* each come from a single reply.
+
+For T2 and T3, the 15th-ranked frequency is 1. The lighter bars therefore reflect the tie-break rule, not higher frequency. Question 2(c) interprets these patterns against the original replies.
+
+### Limitations
+
+The threads differ greatly in size (`r paste(ts$replies_analysed, collapse = ", ")` replies), so absolute frequencies are not comparable across threads, and the T2 and T3 distributions rest on very few tokens.
+
+The replies cover only what the API returned. Language filtering relies on declared metadata: a heuristic check flagged `r sum(reply_flags$possible_non_english)` T1 replies with few English function words. Manual inspection found one French phrase and one list of apple varieties, and both were retained.
+
+Tokenisation and stopword removal discard emoji, word order and negation. For example, the laughing-face reactions in T2 do not appear in its frequency distribution. Word frequencies therefore do not measure sentiment or meaning.
+
+\newpage
+### Appendix: R code for Question 2(b)
+
+\small
+```{r q2b-code, eval=FALSE, echo=TRUE, code=readLines("B_Q2_text.R")}
+```
+\normalsize

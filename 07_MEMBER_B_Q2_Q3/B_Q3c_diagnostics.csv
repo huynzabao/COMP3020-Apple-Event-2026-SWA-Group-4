@@ -1,0 +1,39 @@
+section,item,value,pass
+Q3a-Q3b consistency,1. Q3a clustering input is 211 x 883,NA,TRUE
+Q3a-Q3b consistency,"1b. Q3a population: 229 documents, 18 zero-feature",NA,TRUE
+Q3a-Q3b consistency,"2. Q3b matrix has the same rows (reply_uri, same order)",NA,TRUE
+Q3a-Q3b consistency,3. Q3b matrix has the same vocabulary (names and order),NA,TRUE
+Q3a-Q3b consistency,"3b. Tokenisation: 'mu.social' is one term, 'mu'/'social' absent",NA,TRUE
+Q3a-Q3b consistency,4. Rows map to the eligible reply_uri of Q3a metadata,NA,TRUE
+Q3a-Q3b consistency,5. Q3b matrix equals L2-normalised Q3a matrix (tol 1e-12),NA,TRUE
+Q3a-Q3b consistency,5b. Every Q3b row has unit length,NA,TRUE
+Q3a-Q3b consistency,6. Selected k is 3 (stored value),NA,TRUE
+Q3a-Q3b consistency,"6b. Stored settings: Hartigan-Wong, nstart 50, iter.max 100",NA,TRUE
+Q3a-Q3b consistency,7. Reference assignments cover the same 211 documents,NA,TRUE
+Q3a-Q3b consistency,8. Settings refer to this Q3a RDS (MD5 match),NA,TRUE
+Q3a-Q3b consistency,8b. Settings record the Q3a dimensions and en_AU tokeniser,NA,TRUE
+Reference reproduction,Clusters in reproduced model,3,TRUE
+Reference reproduction,Documents assigned,211,TRUE
+Reference reproduction,Documents with exactly one cluster,211,TRUE
+Reference reproduction,Zero-feature documents clustered,0,TRUE
+Reference reproduction,Cluster sizes equal reference sizes (sorted),NA,TRUE
+Reference reproduction,Total WSS,203.7377662,TRUE
+Reference reproduction,Total WSS recomputed from centroids,203.7377662,TRUE
+Reference reproduction,Assignments identical to reference (after label alignment),211,TRUE
+Reference reproduction,Labels permuted relative to reference (1 = yes),0,TRUE
+Reference reproduction,Adjusted Rand index vs reference,1,TRUE
+Model statistics,Mean silhouette width (all documents),0.008510371409,NA
+Model statistics,Documents with negative silhouette,86,NA
+Model statistics,Total within-cluster sum of squares (WSS),203.7377662,NA
+Model statistics,Between-cluster sum of squares,4.950211374,NA
+Model statistics,Total sum of squares,208.6879776,NA
+Model statistics,Between / total sum of squares,0.02372063514,NA
+Model statistics,Iterations to convergence (best start),4,NA
+Q3b cross-check,Per-cluster silhouettes vs Q3b,MATCH,TRUE
+Configuration,k,3,NA
+Configuration,seed,16,NA
+Configuration,nstart,50,NA
+Configuration,iter.max,100,NA
+Configuration,algorithm,Hartigan-Wong,NA
+Configuration,representation,L2-normalised TF-IDF (eligible documents only),NA
+Configuration,distance,Euclidean on L2-normalised rows (= sqrt(2 * (1 - cosine))),NA

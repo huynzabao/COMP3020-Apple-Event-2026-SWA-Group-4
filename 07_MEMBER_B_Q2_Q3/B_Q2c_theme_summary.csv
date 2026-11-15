@@ -1,0 +1,22 @@
+thread,primary_code,n,pct,theme
+T1,fruit_wordplay,70,37.4,Apple-fruit wordplay or discussion
+T1,apple_product_or_event,20,10.7,"Apple products, prices or the event"
+T1,apple_company_criticism,22,11.8,"Criticism of Apple as a company (politics, ethics)"
+T1,bluesky_platform,19,10.2,Bluesky platform features or relevance
+T1,meaning_of_post,13,7,Confusion or clarification about the post
+T1,short_reaction,20,10.7,Short reaction or emoji only
+T1,other_offtopic,23,12.3,Other or off-topic
+T2,fruit_wordplay,0,0,Apple-fruit wordplay or discussion
+T2,apple_product_or_event,18,69.2,"Apple products, prices or the event"
+T2,apple_company_criticism,0,0,"Criticism of Apple as a company (politics, ethics)"
+T2,bluesky_platform,0,0,Bluesky platform features or relevance
+T2,meaning_of_post,0,0,Confusion or clarification about the post
+T2,short_reaction,6,23.1,Short reaction or emoji only
+T2,other_offtopic,2,7.7,Other or off-topic
+T3,fruit_wordplay,0,0,Apple-fruit wordplay or discussion
+T3,apple_product_or_event,11,68.8,"Apple products, prices or the event"
+T3,apple_company_criticism,3,18.8,"Criticism of Apple as a company (politics, ethics)"
+T3,bluesky_platform,0,0,Bluesky platform features or relevance
+T3,meaning_of_post,0,0,Confusion or clarification about the post
+T3,short_reaction,1,6.2,Short reaction or emoji only
+T3,other_offtopic,1,6.2,Other or off-topic

@@ -1,0 +1,42 @@
+section,check,pass,value
+Input,1. Matrix is 211 x 883 and equals the Q3b representation,TRUE,NA
+Input,1b. Matrix equals L2-normalised Q3a clustering input (tol 1e-12),TRUE,NA
+Input,2. Row names equal the Q3a eligible reply_uri (same order),TRUE,NA
+Input,"3. Vocabulary equals Q3a (883 terms, same order, 'mu.social' one term)",TRUE,NA
+Input,4. reply_uri values are unique,TRUE,NA
+Input,5. Every document has an original thread label (3 labels),TRUE,NA
+Input,6. Cluster assignments are named by reply_uri in matrix order,TRUE,NA
+Input,7. Number of clusters is 3 (k stored in Q3b and Q3c),TRUE,NA
+Input,8. Q3c assignments equal the Q3b reference model,TRUE,NA
+Input,"8b. Settings: seed 16, nstart 50, iter.max 100, Hartigan-Wong",TRUE,NA
+Input,"8c. Cluster sizes are 193, 12, 6 (clusters 1, 2, 3)",TRUE,NA
+Input,9. 229 documents in Q3a; 18 zero-feature documents excluded,TRUE,NA
+Input,10. Q3c CSV assignments equal the model (aligned by reply_uri),TRUE,NA
+Input,"10b. Q3c audit table: 229 rows, cluster missing for the 18 excluded",TRUE,NA
+PCA,PCA computed on all 211 documents and 883 features,TRUE,NA
+PCA,Scores equal centred data times loadings (tol 1e-10),TRUE,NA
+PCA,Loadings of PC1 and PC2 are orthonormal,TRUE,NA
+PCA,Eigenvalues sum to total variance of the matrix,TRUE,NA
+PCA,Eigenvalues are non-increasing,TRUE,NA
+PCA,PC1 and PC2 scores are finite,TRUE,NA
+Plotting data,1. Exactly 211 plotted documents,TRUE,NA
+Plotting data,2. 211 unique reply_uri,TRUE,NA
+Plotting data,3. No missing PCA coordinates,TRUE,NA
+Plotting data,4. All PC1 and PC2 values finite,TRUE,NA
+Plotting data,5. Exactly three cluster labels,TRUE,NA
+Plotting data,"6. Exactly three thread labels, each with its root author",TRUE,NA
+Plotting data,7. Cluster sizes match Q3c,TRUE,NA
+Plotting data,8. Thread counts match the eligible Q3a population,TRUE,NA
+Plotting data,9. Rows align with the PCA input (reply_uri order),TRUE,NA
+Plotting data,10. No zero-feature document plotted,TRUE,NA
+Plotting data,11. Plotted clusters equal B_Q3_clusters.csv,TRUE,NA
+Figure,Figure: 211 points drawn,TRUE,NA
+Figure,Figure: coordinates equal the plotting dataset,TRUE,NA
+Figure,Figure: point colour follows the cluster of each reply,TRUE,NA
+Figure,Figure: point shape follows the thread of each reply,TRUE,NA
+Projection diagnostics,Correlation of 883-D and 2-D pairwise distances,NA,0.020
+Projection diagnostics,Replies sharing identical 2-D coordinates (6 dp),NA,20
+Projection diagnostics,Distinct coordinate positions occupied by those replies,NA,2
+Projection diagnostics,Cluster 1: SD of PC1 / PC2,NA,0.050 / 0.049
+Projection diagnostics,Cluster 2: SD of PC1 / PC2,NA,0.139 / 0.359
+Projection diagnostics,Cluster 3: SD of PC1 / PC2,NA,0.058 / 0.041

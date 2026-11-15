@@ -1,0 +1,14 @@
+metric,value
+raw_input_rows,6837
+duplicate_uri_rows_in_input,0
+technical_issue_rows,0
+valid_distinct_posts,6837
+blank_text_in_valid_posts,36
+english_metadata_in_valid_posts,6837
+topic_include_current,4536
+topic_uncertain_current,551
+eligible_Q1_posts,4536
+manual_event_overrides,200
+manual_duo_overrides,200
+thread_selection_same_as_pilot,1
+network_users_same_as_pilot,1

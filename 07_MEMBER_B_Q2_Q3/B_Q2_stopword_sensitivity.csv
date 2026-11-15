@@ -1,0 +1,4 @@
+thread,words_in_both,only_snowball_list,only_final_list,custom_tokens_removed,top15_snowball_only
+T1,11,"can, just, much, will","bluesky, company, cosmic, product",72,apple (54); apples (20); can (16); just (12); one (10); much (10); will (9); blah (9); fruit (8); delicious (8); iphone (8); name (8); good (7); honeycrisp (7); like (7)
+T2,14,still,alexa,6,apple (4); like (4); looks (3); one (3); phone (3); 2000 (2); look (2); need (2); still (2); tape (2); two (2); using (2); 13 (1); absolutely (1); aerodrome (1)
+T3,14,just,astounds,4,apple (6); just (4); foldable (2); huge (2); phone (2); phones (2); years (2); fight (2); folks (2); maga (2); want (2); 2000 (1); advanced (1); affordable (1); aggressively (1)

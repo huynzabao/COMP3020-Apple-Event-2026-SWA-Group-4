@@ -1,0 +1,25 @@
+metric,value
+Input reply documents (08),229
+Documents represented as matrix rows,229
+Documents with >=1 retained token,211
+Documents with >=1 nonzero TF-IDF feature (eligible),211
+Zero-feature documents (all-zero rows),18
+N used in IDF (documents in bind_tf_idf input),211
+Vocabulary size (columns),883
+Terms occurring in exactly one document (df = 1),668
+Terms occurring in >= 2 documents,215
+Terms with idf = 0 (in every eligible document),0
+Raw tokens (before stopword removal),2744
+Retained tokens (sum of count DTM),1430
+Nonzero entries (TF-IDF DTM),1369
+"Density, full matrix (%)",0.677
+"Sparsity, full matrix (%)",99.323
+"Density, eligible rows only (%)",0.735
+Median nonzero features per eligible document,4
+Max nonzero features per document,29
+Min TF-IDF value (nonzero entries),0.0436314
+Max TF-IDF value,5.35186
+Maximum idf (= ln N),5.35186
+Duplicate row identifiers,0
+Rows without a thread label,0
+Non-finite or negative values,0

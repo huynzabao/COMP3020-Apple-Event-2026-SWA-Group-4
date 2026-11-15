@@ -1,0 +1,24 @@
+cluster,thread,observed,expected_if_unrelated,row_pct,col_pct,measure,value
+Cluster 1,Thread 1,4,4.123222748815166,80,2.2988505747126435,cell,NA
+Cluster 1,Thread 2,0,0.4976303317535545,0,0,cell,NA
+Cluster 1,Thread 3,1,0.3791469194312796,20,6.25,cell,NA
+Cluster 2,Thread 1,145,144.3127962085308,82.85714285714286,83.33333333333334,cell,NA
+Cluster 2,Thread 2,17,17.417061611374407,9.714285714285714,80.95238095238095,cell,NA
+Cluster 2,Thread 3,13,13.270142180094787,7.428571428571429,81.25,cell,NA
+Cluster 3,Thread 1,13,15.66824644549763,68.42105263157895,7.471264367816093,cell,NA
+Cluster 3,Thread 2,4,1.8909952606635072,21.052631578947366,19.047619047619047,cell,NA
+Cluster 3,Thread 3,2,1.4407582938388626,10.526315789473683,12.5,cell,NA
+Cluster 4,Thread 1,6,4.947867298578199,100,3.4482758620689653,cell,NA
+Cluster 4,Thread 2,0,0.5971563981042654,0,0,cell,NA
+Cluster 4,Thread 3,0,0.4549763033175355,0,0,cell,NA
+Cluster 5,Thread 1,6,4.947867298578199,100,3.4482758620689653,cell,NA
+Cluster 5,Thread 2,0,0.5971563981042654,0,0,cell,NA
+Cluster 5,Thread 3,0,0.4549763033175355,0,0,cell,NA
+NA,NA,NA,NA,NA,NA,Adjusted Rand index (clusters vs threads),0.012495974008323434
+NA,NA,NA,NA,NA,NA,Normalised mutual information (geometric mean),0.03348366243462932
+NA,NA,NA,NA,NA,NA,Cramer's V,0.12981993986212936
+NA,NA,NA,NA,NA,NA,Cells with expected count < 5,11
+NA,NA,NA,NA,NA,NA,Thread 1 share of all eligible replies (%),82.46445497630332
+NA,NA,NA,NA,NA,NA,Thread 1 replies in Clusters 2 and 3,170
+NA,NA,NA,NA,NA,NA,Replies in Clusters 2 and 3,206
+NA,NA,NA,NA,NA,NA,P(>= that many Thread 1 replies in 18 random replies),0.6225259389281643

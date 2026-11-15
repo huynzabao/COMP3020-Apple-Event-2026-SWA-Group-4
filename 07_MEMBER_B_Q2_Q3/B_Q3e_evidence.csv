@@ -1,0 +1,5 @@
+purpose,cluster,thread_label,quote,reply_uri,reply_text,verified
+Cluster 2: reply about the meaning of the post,2,Thread 1,They're clearly talking about fruit.,at://did:plc:fplzv7c4jtprkblqeenxuvtt/app.bsky.feed.post/3mv3wtqlxsk2n,They're clearly talking about fruit.,TRUE
+Cluster 2: hostility towards Apple (Thread 1),2,Thread 1,Apple can fuck right off.,at://did:plc:ztmstguzsfkxne7ifuzwa7to/app.bsky.feed.post/3mv3tdzeiqk2t,Apple can fuck right off.,TRUE
+Cluster 2: hostility towards Apple (Thread 3),2,Thread 3,Fuck Apple,at://did:plc:tm4zzyeqpgudcgjnwxp72yky/app.bsky.feed.post/3mv4a462kas2n,Fuck Apple,TRUE
+Cluster 3: apple-variety wordplay,3,Thread 1,Cosmic Crisp apples are a revelation.,at://did:plc:tzcskvxnw3esqczwsqp2zb76/app.bsky.feed.post/3mv3uh6xdbs2z,Cosmic Crisp apples are a revelation.  Sooo good.,TRUE

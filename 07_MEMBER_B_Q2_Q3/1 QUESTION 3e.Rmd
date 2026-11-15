@@ -1,0 +1,89 @@
+---
+output:
+  pdf_document:
+    extra_dependencies: ["booktabs", "longtable", "array", "float"]
+header-includes:
+  - \setlength{\emergencystretch}{3em}
+---
+
+```{r q3e-setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.pos = "H", fig.align = "center")
+library(dplyr); library(knitr); library(kableExtra)
+```
+
+```{r q3e-run, include=FALSE}
+source("B_Q3e_thread_comparison.R")
+
+f1 <- function(x) formatC(x, format = "f", digits = 1)
+f2 <- function(x) formatC(x, format = "f", digits = 2)
+sm <- setNames(summary_out$value, summary_out$measure)
+th <- colnames(tab)
+cnt <- q3a$dtm_counts[clus$reply_uri, , drop = FALSE]
+apple_threads_c1 <- n_distinct(clus$thread_label[clus$cluster == 1 &
+                                                   as.vector(cnt[, "apple"] > 0)])
+z_t2 <- meta %>% filter(!eligible_for_clustering, thread == "T2")
+
+# Guards: every statement in the text is checked against the results.
+stopifnot(
+  all(checks$pass), all(table_checks$pass), all(evidence$verified),
+  all(col_pct["Cluster 1", ] >= 90),                       # >= 90% in Cluster 1
+  tab["Cluster 2", "Thread 1"] == 11, tab["Cluster 2", "Thread 3"] == 1,
+  tab["Cluster 3", "Thread 1"] == 6, sum(tab[c("Cluster 2", "Cluster 3"),
+                                             "Thread 2"]) == 0,
+  abs(row_pct["Cluster 1", "Thread 1"] - 100 * col_tot[["Thread 1"]] / N) < 2,
+  abs(sm[["Adjusted Rand index (clusters vs threads)"]]) < 0.1,
+  sm[["Normalised mutual information (geometric mean)"]] < 0.05,
+  cramers_v < 0.1, p_small_t1 > 0.05,
+  apple_threads_c1 == 3,
+  nrow(z_t2) == 5,
+  all(z_t2$exclusion_reason == "No word tokens (emoji or punctuation only)")
+)
+```
+
+## Question 3(e): Comparison of Clusters and Original Discussion Threads
+
+### Method
+
+The `r N` clustered replies were cross-tabulated by their k-means cluster from Question 3(c) and their original thread: Thread 1 (bsky.app), Thread 2 (the duty-free iPhone Duo post) and Thread 3 (the foldable iPhone Duo announcement). Column percentages, $100\,n_{ct}/n_{\cdot t}$, show how each thread's replies were distributed across clusters. Because the threads differ greatly in size, these are the main basis for comparison. Row percentages, $100\,n_{ct}/n_{c\cdot}$, describe the thread composition of each cluster and are exported in `B_Q3e_cluster_thread_row_pct.csv`. Observed counts were compared with the counts expected if cluster membership were unrelated to thread, $n_{c\cdot}n_{\cdot t}/N$. Agreement between the two partitions was summarised by the adjusted Rand index (ARI), normalised mutual information (NMI) and Cramér's V.
+
+### Results
+
+```{r q3e-table}
+cell <- function(c, t) paste0(tab[c, t], " (", f1(col_pct[c, t]), "%)")
+out <- bind_rows(lapply(rownames(tab), function(c)
+  c(Cluster = c, setNames(vapply(th, function(t) cell(c, t), ""), th),
+    Total = as.character(row_tot[[c]]))),
+  c(Cluster = "Total", setNames(paste0(col_tot, " (100%)"), th),
+    Total = as.character(N)))
+kable(out, format = "latex", booktabs = TRUE, linesep = "", align = "lrrrr",
+      label = "q3e-table",
+      caption = paste0("Cluster-by-thread contingency table for the ", N,
+                       " clustered replies. Cells show counts with column ",
+                       "percentages (share of each thread's replies) in ",
+                       "parentheses.")) %>%
+  kable_styling(latex_options = "HOLD_position", font_size = 9) %>%
+  row_spec(3, hline_after = TRUE)
+```
+
+### Interpretation and comparison
+
+The clusters do not reproduce the thread boundaries (Table \ref{tab:q3e-table}). Each thread placed at least 90% of its replies in Cluster 1, and no cluster isolates Thread 2 or Thread 3. The agreement measures are close to zero (ARI `r f2(sm[["Adjusted Rand index (clusters vs threads)"]])`, NMI `r f2(sm[["Normalised mutual information (geometric mean)"]])`, Cramér's V `r f2(cramers_v)`).
+
+Thread 1 dominates every cluster, but mainly because it supplies `r f1(100 * col_tot[["Thread 1"]] / N)`% of the replies. Cluster 1 is `r f1(row_pct["Cluster 1", "Thread 1"])`% Thread 1, close to that base rate. Clusters 2 and 3 contain `r tab["Cluster 2", "Thread 1"]` and `r tab["Cluster 3", "Thread 1"]` Thread 1 replies, against `r f1(expected["Cluster 2", "Thread 1"])` and `r f1(expected["Cluster 3", "Thread 1"])` expected. In 18 replies drawn at random, `r t1_small` or more would come from Thread 1 with probability `r f2(p_small_t1)`.
+
+The small clusters isolate narrow lexical patterns within Thread 1 that correspond to themes identified in Question 2(c). Cluster 3 captures apple-variety wordplay ("Cosmic Crisp apples are a revelation."). Cluster 2 combines replies about the meaning of the post ("They're clearly talking about fruit.") with hostility towards Apple. Its only non-Thread 1 member is a two-word expletive about Apple from Thread 3, grouped with a similarly worded Thread 1 reply. This is the one clear cross-thread link, and it rests on shared words rather than a shared discussion.
+
+The mockery in Thread 2 and the product criticism in Thread 3 are not separated; they remain in the residual Cluster 1. Common terms such as *apple*, which occurs there in replies from all three threads, carry different meanings in different threads. The clustering therefore groups replies by narrow shared vocabulary, mostly within Thread 1, rather than by conversation.
+
+### Limitations
+
+The comparison inherits the weak separation of the clusters (near-zero silhouettes) and the dominance of Cluster 1. With only `r row_tot[["Cluster 2"]]` and `r row_tot[["Cluster 3"]]` replies in the small clusters, and `r sum(expected < 5)` of 9 expected counts below 5, the proportions are unstable and no significance test was applied. Shared words do not imply shared meaning. The `r sum(!meta$eligible_for_clustering)` zero-feature replies, including `r nrow(z_t2)` emoji-only replies from Thread 2, are excluded from the comparison.
+
+\newpage
+### Appendix: R code for Question 3(e)
+
+\small
+```{r q3e-code, eval=FALSE, echo=TRUE, code=readLines("B_Q3e_thread_comparison.R")}
+```
+\normalsize

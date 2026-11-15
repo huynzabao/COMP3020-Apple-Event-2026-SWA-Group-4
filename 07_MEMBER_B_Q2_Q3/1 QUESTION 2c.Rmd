@@ -1,0 +1,107 @@
+---
+output:
+  pdf_document:
+    extra_dependencies: ["booktabs", "longtable", "array", "float"]
+header-includes:
+  - \setlength{\emergencystretch}{3em}
+---
+
+```{r q2c-setup, include=FALSE}
+# When merged into Report.Rmd, move these lines to the report's setup chunk
+# and the YAML entries above to the report's YAML header.
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(dplyr); library(readr); library(stringr); library(tidyr)
+library(knitr); library(kableExtra)
+```
+
+```{r q2c-run, include=FALSE}
+# Runs the Q2(c) evidence checks (listed in full in the appendix).
+source("B_Q2c_interpretation.R")
+
+th_n  <- function(th, code) theme_summary$n[theme_summary$thread == th &
+                                              theme_summary$primary_code == code]
+kd    <- function(g, th) keyword_doc_counts[[paste0("replies_", th)]][
+                           keyword_doc_counts$group == g]
+ap    <- function(code) apple_sense_T1$replies_containing_apple[
+                          apple_sense_T1$primary_code == code]
+n_th  <- table(coded$thread)
+ap_total <- sum(apple_sense_T1$replies_containing_apple)
+t2_zero  <- sum(zero_tok$thread == "T2")
+is_pdf <- knitr::is_latex_output()
+q_uri <- function(th) {
+  u <- evidence$reply_uri[evidence$thread == th]
+  if (is_pdf) paste0("\\url{", u, "}") else paste0("`", u, "`")
+}
+
+# Guards for the quantitative statements made in the text below
+stopifnot(
+  th_n("T1", "fruit_wordplay") == max(theme_summary$n[theme_summary$thread == "T1"]),
+  th_n("T2", "fruit_wordplay") == 0, th_n("T3", "fruit_wordplay") == 0,
+  th_n("T1", "bluesky_platform") > 0, th_n("T2", "bluesky_platform") == 0,
+  th_n("T3", "bluesky_platform") == 0,
+  all(sapply(c("T1", "T2", "T3"), function(t) kd("price", t)) > 0),
+  kd("device_mockery", "T2") > 0, kd("device_mockery", "T1") == 0,
+  kd("size_practicality", "T3") > 0,
+  ap("apple_product_or_event") < ap("fruit_wordplay"),
+  ap("apple_product_or_event") < ap("apple_company_criticism"),
+  t2_zero == 5, all(evidence$verified_verbatim)
+)
+```
+
+## Question 2(c): Interpretation and comparison of discussion themes
+
+Every retrieved reply was read and assigned one primary theme by Owner B (Table 1). This is a single-coder, provisional coding. Document-level keyword counts and quotations were then verified in R (appendix).
+
+```{r q2c-theme-table}
+theme_summary %>%
+  mutate(cell = paste0(n, " (", sprintf("%.0f", pct), "%)")) %>%
+  select(theme, thread, cell) %>%
+  pivot_wider(names_from = thread, values_from = cell) %>%
+  rename(`Primary theme` = theme,
+         !!paste0("T1 (n = ", n_th["T1"], ")") := T1,
+         !!paste0("T2 (n = ", n_th["T2"], ")") := T2,
+         !!paste0("T3 (n = ", n_th["T3"], ")") := T3) %>%
+  (function(tab) {
+    cap <- paste("Primary theme of each reply by thread (single-coder,",
+                 "provisional coding of all retained replies).")
+    if (!is_pdf) return(kable(tab, format = "pipe", caption = paste("Table 1:", cap)))
+    kable(tab, format = "latex", booktabs = TRUE, linesep = "", caption = cap) %>%
+      kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+  })()
+```
+
+### Thread-level interpretation
+
+**T1.** Although *apple* is the most frequent word in T1, the replies show that it rarely refers to the launch. Of the `r ap_total` T1 replies containing *apple*:
+
+- `r ap("fruit_wordplay")` play on apples as fruit;
+- `r ap("apple_company_criticism")` criticise Apple as a company;
+- only `r ap("apple_product_or_event")` concern its products or the event.
+
+Many users extended the root account's pun by naming apple varieties (`r kd("apple_varieties", "T1")` replies). Others questioned what the post meant (`r th_n("T1", "meaning_of_post")`), commented on Bluesky features (`r th_n("T1", "bluesky_platform")`) or attacked Apple politically (`r th_n("T1", "apple_company_criticism")`). One reply captures the double meaning: "The only apple product I buy is a fruit."^[T1, reply URI: `r q_uri("T1")`]
+
+**T2.** The replies treat the duty-free post as a joke rather than an advertisement. A total of `r kd("device_mockery", "T2")` replies mock the device's build or appearance, for example: "Got mine on Temu."^[T2, reply URI: `r q_uri("T2")`] Another `r kd("laughing_emoji", "T2")` replies contain laughing-face emoji. Of these, `r t2_zero` contain no words, so they do not appear in the Question 2(b) frequencies.
+
+**T3.** T3 contains the most direct product critique. Replies question the foldable's price and size, and `r kd("competitors_lateness", "T3")` present Apple as late relative to Samsung, China or existing foldables, for example: "Isn't it cute how apple comes up with all these innovations 7 years after Samsung?"^[T3, reply URI: `r q_uri("T3")`]
+
+### Cross-thread comparison
+
+The threads share vocabulary rather than themes. *Apple* denotes the fruit in much of T1, the mocked device in T2 and the company in T3.
+
+The nature of each root post appears to shape its replies. A pun drew wordplay and discussion of the post itself, a mock advertisement drew ridicule, and a factual announcement drew product criticism.
+
+Price is the only concern raised in all three threads (`r kd("price", "T1")`, `r kd("price", "T2")` and `r kd("price", "T3")` replies). Explicit enthusiasm for the products is rare in the retrieved replies. These observations describe this sample of `r sum(n_th)` replies, not Bluesky users generally.
+
+### Limitations
+
+T1 contributes `r round(100 * n_th["T1"] / sum(n_th))`% of the replies, while T2 and T3 rest on `r n_th["T2"]` and `r n_th["T3"]` replies, so their themes are fragile. Retrieval was incomplete and excluded attached images, although several T2 replies refer to the image. Irony and humour make intent uncertain. The theme coding was performed by one coder and has not been checked for inter-rater agreement.
+
+\newpage
+### Appendix: R code for Question 2(c)
+
+The manual coding is stored in `B_Q2c_reply_codes.csv` (one row per reply). The script below validates it and produces the counts and quotation checks used above.
+
+\small
+```{r q2c-code, eval=FALSE, echo=TRUE, code=readLines("B_Q2c_interpretation.R")}
+```
+\normalsize

@@ -1,0 +1,5 @@
+period,duo_status,expected_count
+Before,Yes,271.968253968254
+After,Yes,2364.031746031746
+Before,No,196.03174603174602
+After,No,1703.968253968254

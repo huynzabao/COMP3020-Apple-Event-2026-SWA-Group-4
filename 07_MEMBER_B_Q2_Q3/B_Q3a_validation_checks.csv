@@ -1,0 +1,20 @@
+check,value
+1. Rows in 08 (documents),229
+2. Distinct reply_uri in 08,229
+3. Duplicate reply_uri in 08,0
+3b. Missing reply_uri in 08,0
+4. Missing or blank reply_text in 08,0
+5. Distinct root_uri in 08,3
+6. Distinct thread_label values in 08,3
+6b. Rows with missing thread_label,0
+7. Rows whose root_uri is not a Q2(a) root,0
+7b. thread_label maps one-to-one to T1-T3 (1 = yes),1
+8. Rows in 07 (Q2 reply population),229
+8b. 08 reply_uri set equals 07 reply_uri set (1 = yes),1
+8c. Rows with root_uri differing between 07 and 08,0
+9. Rows with reply_text differing between 07 and 08,0
+10. Handoff status permits reuse (1 = REUSE_OK),1
+10b. Top-3 threads still match pilot (1 = TRUE),1
+Documents in T1 (Thread 1),187
+Documents in T2 (Thread 2),26
+Documents in T3 (Thread 3),16

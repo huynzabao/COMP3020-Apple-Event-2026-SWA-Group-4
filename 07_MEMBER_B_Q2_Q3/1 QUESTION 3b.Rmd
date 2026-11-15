@@ -1,0 +1,134 @@
+---
+output:
+  pdf_document:
+    extra_dependencies: ["booktabs", "longtable", "array", "float"]
+header-includes:
+  - \setlength{\emergencystretch}{3em}
+---
+
+```{r q3b-setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.pos = "H", fig.align = "center")
+library(dplyr); library(readr); library(knitr); library(kableExtra)
+```
+
+```{r q3b-run, include=FALSE}
+source("B_Q3b_select_k.R")
+
+f4  <- function(x) formatC(x, format = "f", digits = 4)
+g   <- setNames(geometry$value, geometry$metric)
+sk  <- scores_l2 %>% filter(k == k_selected)
+sk_at <- function(kk) scores_l2 %>% filter(k == kk)
+raw <- norm_comparison %>% filter(representation == "Raw TF-IDF")
+sel_sizes <- cluster_sizes %>%
+  filter(representation == "L2-normalised TF-IDF", k == k_selected)
+rs <- function(m, p) rule_sensitivity$selected_k[
+  rule_sensitivity$min_size_alt == m & rule_sensitivity$max_prop_alt == p]
+n_docs <- nrow(X_l2)
+
+# Values of k in the primary range by reason for (in)admissibility
+prim     <- scores_l2 %>% filter(range == "primary")
+adm      <- prim$k[prim$admissible]
+ref_fail <- prim$k[prim$ref_n_micro > 0]
+seed_fail <- prim$k[prim$ref_n_micro == 0 & prim$prop_seeds_micro > max_prop_micro]
+and_list <- function(x) if (length(x) == 1) as.character(x) else
+  paste0(paste(head(x, -1), collapse = ", "), "$ and $", tail(x, 1))  # math-safe
+pct <- function(x) paste0(round(100 * x), "%")
+# Smallest k whose reference solution contains a two-document cluster made of
+# two identical vectors (used as the example of an uninformative micro-cluster)
+k_dup <- min(Filter(function(kk) {
+  f <- ev_l2$fits[[paste(kk, ref_l2$seed[ref_l2$k == kk])]]
+  two <- which(f$cluster %in% which(f$size == 2))
+  length(two) == 2 && isTRUE(all.equal(X_l2[two[1], ], X_l2[two[2], ]))
+}, k_primary))
+
+stopifnot(
+  # authoritative Q3(a) snapshot: 211 x 883, same rows and terms as Q3(a)
+  n_docs == 211, ncol(X_l2) == 883,
+  identical(colnames(X_l2), q3a$vocabulary$term),
+  identical(rownames(X_l2), rownames(q3a$clustering_input)),
+  all(input_checks$value[grepl("^9[b-e]", input_checks$check)] %in% c(1, NA)),
+  sil_monotone, k_unconstrained_extended == max(k_all),
+  all(scores_l2$sil_mean < 0.05), all(raw$sil_mean > 0.3),
+  all(raw$ref_largest_share > 0.95), all(raw$ref_n_singleton[raw$k >= 3] >= 1),
+  all(diff(sensitivity$sil_cosine) > 0),
+  # selection paragraph
+  k_selected == 3, identical(adm, c(2L, 3L)),
+  identical(seed_fail, c(5L, 6L)), identical(ref_fail, c(4L, 7L, 8L, 9L, 10L)),
+  is.finite(k_dup),
+  # quality paragraph
+  sel_sizes$mean_sil[1] < 0, sel_sizes$mean_sil[1] > -0.01,
+  all(sel_sizes$mean_sil[-1] > 0.05), sk$ref_largest_share > 0.9,
+  sk$mean_ari > 0.75,
+  # threshold paragraph
+  rs(5, 0.5) > k_selected, rs(4, 0.2) > k_selected, rs(6, 0.2) == k_selected,
+  length(k_all) + length(k_primary) == 28
+)
+```
+
+## Question 3(b): Determining the Optimal Number of Clusters
+
+### Method
+
+The clustering input is the `r n_docs` $\times$ `r ncol(X_l2)` TF-IDF matrix of eligible documents from Question 3(a), loaded from the saved Question 3(a) object without modification; its row order (`reply_uri`) and vocabulary were verified to be identical to those of Question 3(a). Because tf is normalised by document length but rows are not scaled, vector norms ranged from `r round(g[["Raw TF-IDF row norm: min"]], 2)` to `r round(g[["Raw TF-IDF row norm: max"]], 2)`: a short reply containing one rare term lies far from every other document. Each row was therefore L2-normalised, $\tilde{\mathbf{x}}_i = \mathbf{x}_i / \lVert \mathbf{x}_i \rVert_2$. For unit vectors, $\lVert \tilde{\mathbf{x}}_i - \tilde{\mathbf{x}}_j \rVert_2^2 = 2\,(1 - \cos\theta_{ij})$, so Euclidean distance becomes a monotone function of cosine similarity and reflects shared vocabulary rather than reply length. The unnormalised matrix was evaluated for comparison.
+
+K-means (`stats::kmeans`, Hartigan--Wong, `nstart` = `r nstart`) was fitted for $k = `r min(k_primary)`, \ldots, `r max(k_primary)`$ and, because no interior optimum appeared, extended to $k = `r max(k_all)`$. Each $k$ was fitted with `r length(seeds)` seeds, and the solution with the lowest within-cluster sum of squares (WSS) was retained as the reference solution. Cluster quality was measured by the silhouette width of every document,
+
+$$
+s(i) = \frac{b(i) - a(i)}{\max\{a(i),\, b(i)\}}, \qquad -1 \le s(i) \le 1,
+$$
+
+where $a(i)$ is the mean distance from document $i$ to the other members of its cluster and $b(i)$ is the smallest mean distance to the members of another cluster. Values near 1 indicate a document much closer to its own cluster than to any other, values near 0 indicate a document between clusters, and negative values suggest misassignment. Silhouettes were computed for all `r n_docs` documents with the Euclidean distance on the L2-normalised vectors, the same distance minimised by k-means. Stability across seeds was summarised by the mean pairwise adjusted Rand index (ARI). In total, `r length(k_all) + length(k_primary)` configurations (`r length(k_all)` values of $k$ for the normalised matrix and `r length(k_primary)` for the unnormalised matrix) were each fitted `r length(seeds)` times.
+
+Because silhouette on sparse text can increase merely by separating a few near-identical replies, a value of $k$ was considered admissible only if its reference solution contained no cluster of fewer than `r micro_size` documents and at most `r round(100 * max_prop_micro)`% of seeds produced such a cluster. The selected $k$ is the admissible value in the primary range with the highest mean silhouette.
+
+### Results
+
+```{r q3b-fig, fig.cap = paste0("Mean silhouette width by number of clusters (k-means on L2-normalised TF-IDF, ", n_docs, " documents). Points are means over ", length(seeds), " seeds; vertical bars show the range across seeds. Open circles mark values of k that fail the micro-cluster rule."), out.width = "84%"}
+include_graphics("outputs_B/Q3b/B_Q3b_silhouette_plot.png")
+```
+
+```{r q3b-table}
+scores_l2 %>% filter(range == "primary") %>%
+  transmute(k,
+            `Mean silhouette (SD)` = paste0(f4(sil_mean), " (", f4(sil_sd), ")"),
+            WSS = formatC(ref_wss, format = "f", digits = 1),
+            `Smallest cluster` = ref_min_size, `Largest cluster` = ref_max_size,
+            `Seeds with micro-cluster (%)` = round(100 * prop_seeds_micro),
+            `Mean ARI` = formatC(mean_ari, format = "f", digits = 2),
+            Admissible = if_else(admissible, "Yes", "No"),
+            ) %>%
+  kable(format = "latex", booktabs = TRUE, linesep = "", align = "lrrrrrrc",
+        label = "q3b-k",
+        caption = paste0("Evaluation of k-means solutions on the L2-normalised ",
+                         "TF-IDF matrix. Cluster sizes and WSS refer to the ",
+                         "reference (lowest-WSS) solution; a micro-cluster has ",
+                         "fewer than ", micro_size, " documents.")) %>%
+  kable_styling(latex_options = c("HOLD_position", "scale_down"), font_size = 9) %>%
+  row_spec(which(scores_l2$k[scores_l2$range == "primary"] == k_selected),
+           bold = TRUE)
+```
+
+Mean silhouette widths were very low for every $k$: between `r f4(min(scores_l2$sil_mean))` and `r f4(max(scores_l2$sil_mean))`. They increased monotonically from $k = 2$ to $k = `r max(k_all)`$ (Figure \ref{fig:q3b-fig}), and the same shape was obtained with cosine distance (`B_Q3b_sensitivity.csv`). The increase is driven by small clusters: `r g[["Share of orthogonal pairs (%)"]]`% of document pairs share no term, and each additional cluster tends to separate a small group of replies with common vocabulary. As $k$ rises, the share of seeds producing a micro-cluster rises from `r round(100 * sk_at(4)$prop_seeds_micro)`% at $k = 4$ to `r round(100 * sk_at(9)$prop_seeds_micro)`% at $k = 9$ (Table \ref{tab:q3b-k}).
+
+The unnormalised matrix gave much higher silhouettes (`r round(min(raw$sil_mean), 2)`--`r round(max(raw$sil_mean), 2)`), but every solution placed at least `r round(100 * min(raw$ref_largest_share))`% of documents in one cluster, and for $k \ge 3$ the remaining clusters included singletons of short, high-norm replies. The high score reflects the separation of outliers by vector length, not thematic structure, so the raw representation was rejected (`B_Q3b_normalisation_comparison.csv`).
+
+### Selection and justification
+
+Silhouette alone cannot determine $k$ here, because its maximum lies at the upper end of every range examined. The micro-cluster rule is an analyst-defined safeguard, not a statistical criterion: it prevents the average from being raised by clusters too small to interpret, such as the two identical replies that form their own cluster in the reference solution for $k = `r k_dup`$. Conditional on this rule, **$k = `r k_selected`$** is selected. Its mean silhouette is `r f4(sk$sil_mean)` (SD `r f4(sk$sil_sd)` across seeds; `r f4(sk$ref_sil)` for the reference solution), higher than that of the only other admissible value, $k = `r setdiff(adm, k_selected)`$. All larger values in the primary range fail the rule. For $k = `r and_list(ref_fail)`$, the reference solution contains a micro-cluster. For $k = `r and_list(seed_fail)`$, the reference solution has no cluster below `r micro_size` documents, but micro-clusters occur in `r pct(sk_at(seed_fail[1])$prop_seeds_micro)` and `r pct(sk_at(seed_fail[2])$prop_seeds_micro)` of seeds respectively, above the `r pct(max_prop_micro)` limit.
+
+The selected solution should not be read as `r k_selected` well-separated thematic groups, nor as a reflection of the three discussion threads. Its reference solution has cluster sizes `r paste(sel_sizes$size, collapse = ", ")`. The largest cluster contains `r pct(sk$ref_largest_share)` of the documents and has a mean silhouette of $`r f4(sel_sizes$mean_sil[1])`$: it shows no cohesion and acts as a residual group. The two small clusters have mean silhouettes of `r f4(sel_sizes$mean_sil[2])` and `r f4(sel_sizes$mean_sil[3])`. Partitions are reproducible across seeds (mean ARI `r round(sk$mean_ari, 2)`), but this reflects the repeated separation of the same two small groups rather than strong overall structure. The evidence therefore indicates weak separation: $k = `r k_selected`$ identifies two small groups of replies with shared vocabulary within an otherwise unstructured set.
+
+The selection is also sensitive to the rule. $k = 5$ fails only the seed criterion, at `r pct(sk_at(5)$prop_seeds_micro)` against a `r pct(max_prop_micro)` limit. With a limit of 50%, the rule would select $k = `r rs(5, 0.5)`$; a minimum size of 4 documents would select $k = `r rs(4, 0.2)`$; and a minimum size of 6 documents also selects $k = `r rs(6, 0.2)`$. The value $k = `r k_selected`$ is therefore a conservative exploratory choice under the documented rule, not a mathematically unique optimum. The exact configuration (representation, vocabulary, document order, $k$, seed and reference assignments) is saved for Question 3(c) in `B_Q3b_selected_settings.rds`.
+
+### Limitations
+
+All silhouettes are close to zero, so the replies do not form well-separated clusters under this representation. This is expected for short, sparse replies in which most pairs share no term. Because $k = 5$ fails the rule by a narrow margin, small changes to the data or to the rule could change the selected $k$. Stability was assessed only across random initialisations. Robustness to the distance form and to the micro-cluster threshold was checked, but robustness to resampling of documents was not. Finally, T1 contributes most documents, so the clusters may largely reflect T1 vocabulary.
+
+\newpage
+### Appendix: R code for Question 3(b)
+
+\small
+```{r q3b-code, eval=FALSE, echo=TRUE, code=readLines("B_Q3b_select_k.R")}
+```
+\normalsize

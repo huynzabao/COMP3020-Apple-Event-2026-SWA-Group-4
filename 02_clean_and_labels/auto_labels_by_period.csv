@@ -1,0 +1,10 @@
+period,auto_event_label,auto_duo_label,n
+After,exclude,not_applicable,1375
+After,include,no,1522
+After,include,yes,2549
+After,uncertain,no,412
+After,uncertain,yes,12
+Before,exclude,not_applicable,371
+Before,include,no,370
+Before,include,yes,82
+Before,uncertain,no,144

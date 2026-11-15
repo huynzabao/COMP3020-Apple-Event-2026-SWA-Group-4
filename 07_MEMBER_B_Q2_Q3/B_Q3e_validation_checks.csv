@@ -1,0 +1,22 @@
+section,check,pass
+Snapshot,"1. 211 eligible reply_uri, all unique",TRUE
+Snapshot,2. Every eligible reply has one thread label (3 labels),TRUE
+Snapshot,3. Every eligible reply has exactly one cluster (1-3),TRUE
+Snapshot,4. CSV clusters identical to the Q3c model and the Q3b reference,TRUE
+Snapshot,"5. Cluster sizes 193, 12, 6 (total 211)",TRUE
+Snapshot,"6. Eligible thread counts 174, 21, 16 (total 211)",TRUE
+Snapshot,"6b. Q2/Q3 population thread counts 187, 26, 16 (file 07)",TRUE
+Snapshot,7. 18 zero-feature replies excluded (cluster missing in audit table),TRUE
+Snapshot,8. Thread labels and root_uri equal Q3a metadata,TRUE
+Snapshot,"9. Same document order in Q3a, Q3b, Q3c and Q3d",TRUE
+Snapshot,"10. Final snapshot: 883 terms, k = 3, seed 16 (no 884-term or k = 5 files)",TRUE
+Contingency table,Table is 3 x 3,TRUE
+Contingency table,Grand total is 211 (no missing or duplicated replies),TRUE
+Contingency table,Row totals equal Q3c cluster sizes,TRUE
+Contingency table,Column totals equal Q3a eligible thread counts,TRUE
+Contingency table,Row percentages sum to 100 in every cluster,TRUE
+Contingency table,Column percentages sum to 100 in every thread,TRUE
+Evidence,Cluster 2: reply about the meaning of the post,TRUE
+Evidence,Cluster 2: hostility towards Apple (Thread 1),TRUE
+Evidence,Cluster 2: hostility towards Apple (Thread 3),TRUE
+Evidence,Cluster 3: apple-variety wordplay,TRUE

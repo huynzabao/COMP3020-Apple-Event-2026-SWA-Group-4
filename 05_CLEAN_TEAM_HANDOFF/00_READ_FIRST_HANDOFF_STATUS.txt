@@ -1,0 +1,23 @@
+COMP3020 | APPLE EVENT | CLEAN TEAM HANDOFF
+Created at UTC: 2026-11-11T06:36:24Z
+Selected run: /Users/baohuynh/Desktop/Stage 2/Data/SWA/APPLE_EVENT_2026/APPLE_EVENT_2026_RUN_20261028_045034
+Input rows: 6837
+Technically valid, distinct URI posts: 6837
+Technical issue rows: 0
+Posts included under current rules + overrides: 4536
+Q1 posts with known Duo yes/no: 4536
+Human event overrides received: 200
+Human Duo overrides received: 200
+Before included: 468
+After included: 4068
+Top-3 threads still match pilot: TRUE
+Q2/Q3 replies status: REUSE_OK: 229 English nonempty thread reply rows; 229 distinct documents for Q3. Check actual language manually.
+Top-3 network actors still match pilot: TRUE
+Q4 network status: REUSE_OK: 162 directed follow edges (from_did FOLLOWS to_did).
+IMPORTANT: rule_based labels are PROVISIONAL until the manual sample is reviewed.
+English metadata is not proof of language; spot-check foreign-language posts.
+Identical text from distinct post URIs is FLAGGED, not silently deleted.
+API search results are a query-dependent sample, not a Bluesky census.
+The 100 Before + 100 After audit is stratified, NOT a prevalence estimate.
+Do not reuse Q2/Q3 or Q4 pilot network if top users/posts change after review.
+Q4 follower relationships are measured at retrieval time, not the event date.
